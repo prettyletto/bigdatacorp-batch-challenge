@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"time"
 )
 
 type Stats struct {
@@ -33,6 +34,20 @@ type Club struct {
 	Nickname     *string  `json:"nickname"`
 	Players      []Player `json:"players"`
 	Colors       []string `json:"colors"`
+}
+
+var clubHeader = []string{
+	"Id do Clube",
+	"Nome",
+	"Campeonato",
+	"Data de Fundação",
+	"Cidade",
+	"Estado",
+	"País",
+	"Estádio",
+	"Presidente",
+	"Apelido",
+	"Cores",
 }
 
 type Player struct {
@@ -123,6 +138,28 @@ func process(r io.Reader) (Stats, error) {
 	return stats, nil
 }
 
+// WRITTERS (Later i need to put this into package)
+func clubRow(club Club) []string {
+	nickname := ""
+	if club.Nickname != nil {
+		nickname = *club.Nickname
+	}
+
+	return []string{
+		club.ClubID,
+		club.Name,
+		club.Championship,
+		normalizeDate(club.FoundingDate),
+		club.City,
+		club.State,
+		club.Country,
+		club.Stadium,
+		club.President,
+		nickname,
+		strings.Join(club.Colors, "|"),
+	}
+}
+
 // HELPERS
 func isJSONL(path string) bool {
 	return strings.EqualFold(filepath.Ext(path), ".jsonl")
@@ -137,6 +174,20 @@ func filterChampionship(value string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func normalizeDate(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+
+	t, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return ""
+	}
+
+	return t.Format("2006-01-02")
 }
 
 func printStats(stdout io.Writer, stats Stats) {
