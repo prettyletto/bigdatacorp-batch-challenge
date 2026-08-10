@@ -22,20 +22,27 @@ func main() {
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "uso: batch <input.jsonl>")
-		os.Exit(1)
+		return 1
 	}
 
 	inputPath := os.Args[1]
 
+	if !isJSONL(inputPath) {
+		fmt.Fprintf(stderr, "erro: arquivo fora da extensão .jsonl")
+		return 1
+	}
+
 	file, err := os.Open(inputPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao abrir o arquivo de entrada: %v\n", err)
+		return 1
 	}
 	defer file.Close()
 
 	stats, err := process(file)
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao processar arquivo: %v\n", err)
+		return 1
 	}
 
 	printStats(stdout, stats)
