@@ -58,3 +58,7 @@ Sync instructions:
 Export generated at: 2026-08-10T19:39:09Z
 
 <!-- END PATRONO GENERATED -->
+
+## Response Language
+
+Always respond to the user in en-US English for this conversation.
