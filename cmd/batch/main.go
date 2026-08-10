@@ -19,7 +19,7 @@ type Stats struct {
 	MalformedRecords     int64
 	FilteredChampionship int64
 	SerieAClubs          int64
-	SerieBclubs          int64
+	SerieBClubs          int64
 	ClubRowsWritten      int64
 }
 
@@ -98,6 +98,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
+	outputFile.Close()
 	printStats(stdout, stats)
 
 	return 0
@@ -136,7 +137,7 @@ func process(r io.Reader, output io.Writer) (Stats, error) {
 				case "SERIE A":
 					stats.SerieAClubs++
 				case "SERIE B":
-					stats.SerieBclubs++
+					stats.SerieBClubs++
 				}
 
 				if err := clubsWriter.Write(clubRow(club)); err != nil {
@@ -163,7 +164,7 @@ func process(r io.Reader, output io.Writer) (Stats, error) {
 	return stats, nil
 }
 
-// WRITTERS (Later i need to put this into package)
+// WRITERS (Later i need to put this into package)
 func clubRow(club Club) []string {
 	nickname := ""
 	if club.Nickname != nil {
@@ -226,6 +227,6 @@ func printStats(stdout io.Writer, stats Stats) {
 	fmt.Fprintf(w, "Registros Malformados\t%d\n", stats.MalformedRecords)
 	fmt.Fprintf(w, "Clubes Filtrados(SEM CAMPEONATO)\t%d\n", stats.FilteredChampionship)
 	fmt.Fprintf(w, "Clubes Série A\t%d\n", stats.SerieAClubs)
-	fmt.Fprintf(w, "Clubes Série B\t%d\n", stats.SerieBclubs)
+	fmt.Fprintf(w, "Clubes Série B\t%d\n", stats.SerieBClubs)
 	fmt.Fprintf(w, "Linhas de Clubes Geradas \t%d\n", stats.ClubRowsWritten)
 }
