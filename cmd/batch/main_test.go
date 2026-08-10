@@ -94,7 +94,7 @@ func TestRunProcessesValidJSONLFile(t *testing.T) {
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr deveria estar vazio, recebeu %q", stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Registros lidos        6") {
+	if !strings.Contains(stdout.String(), "Registros lidos                      6") {
 		t.Fatalf("esperava contagem da amostra em stdout, recebeu %q", stdout.String())
 	}
 }
@@ -120,8 +120,32 @@ func TestIsJSONL(t *testing.T) {
 	}
 }
 
+func TestFilterChampionship(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+		ok    bool
+	}{
+		{name: "serie A", value: "SERIE A", want: "SERIE A", ok: true},
+		{name: "serie B", value: "SERIE B", want: "SERIE B", ok: true},
+		{name: "espacos ao redor", value: "  SERIE A  ", want: "SERIE A", ok: true},
+		{name: "campeonato nao elegivel", value: "SERIE C", want: "", ok: false},
+		{name: "campeonato ausente", value: "", want: "", ok: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := filterChampionship(tt.value)
+			if got != tt.want || ok != tt.ok {
+				t.Fatalf("filterChampionship(%q) = (%q, %t), queria (%q, %t)", tt.value, got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
+
 func TestProcessCountsAllRecordsAndSkipsMalformedOnes(t *testing.T) {
-	input := strings.NewReader("{\"club_id\":\"SCCP\"}\njson invalido\n{\"club_id\":\"SEP\"}")
+	input := strings.NewReader("{\"club_id\":\"SCCP\",\"championship\":\"SERIE A\"}\njson invalido\n{\"club_id\":\"SEP\",\"championship\":\"SERIE B\"}")
 
 	stats, err := process(input)
 
@@ -133,6 +157,9 @@ func TestProcessCountsAllRecordsAndSkipsMalformedOnes(t *testing.T) {
 	}
 	if stats.MalformedRecords != 1 {
 		t.Fatalf("Registros malformados = %d, queria 1", stats.MalformedRecords)
+	}
+	if stats.SerieAClubs != 1 || stats.SerieBclubs != 1 || stats.FilteredChampionship != 0 {
+		t.Fatalf("metricas de campeonato = %+v, queria 1 clube em cada serie e nenhum filtrado", stats)
 	}
 }
 
@@ -165,6 +192,15 @@ func TestProcessReadsSampleFile(t *testing.T) {
 	if stats.MalformedRecords != 0 {
 		t.Fatalf("Registros malformados = %d, queria 0", stats.MalformedRecords)
 	}
+	if stats.SerieAClubs != 3 {
+		t.Fatalf("Registros SERIE A = %d, queria 3", stats.SerieAClubs)
+	}
+	if stats.SerieBclubs != 2 {
+		t.Fatalf("Registros SERIE B = %d, queria 2", stats.SerieBclubs)
+	}
+	if stats.FilteredChampionship != 1 {
+		t.Fatalf("Registros filtrados = %d, queria 1", stats.FilteredChampionship)
+	}
 }
 
 func TestPrintStats(t *testing.T) {
@@ -172,7 +208,7 @@ func TestPrintStats(t *testing.T) {
 
 	printStats(&output, Stats{RecordsRead: 12, MalformedRecords: 3})
 
-	want := "Resultados do Batch\n\nMétrica                Total\nRegistros lidos        12\nRegistros Malformados  3\n"
+	want := "Resultados do Batch\n\nMétrica                              Total\nRegistros lidos                      12\nRegistros Malformados                3\nRegistros SERIE A                    0\nRegistros SERIE B                    0\nRegistros Filtrados(SEM CAMPEONATO)  0\n"
 	if output.String() != want {
 		t.Fatalf("saida = %q, queria %q", output.String(), want)
 	}
