@@ -32,6 +32,7 @@ Collaboration rules:
 Agent safety rules:
 - Never modify production code
 - Do not add third-party test libraries unless explicitly requested
+- If an edge case requires a new product or implementation decision, report it instead of encoding it as a failing test
 
 ## Patrono Workspace
 
