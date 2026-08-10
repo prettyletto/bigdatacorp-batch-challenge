@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"text/tabwriter"
 )
 
@@ -14,8 +16,12 @@ type Stats struct {
 }
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: batch <input.jsonl>")
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdout, stderr io.Writer) int {
+	if len(os.Args) != 1 {
+		fmt.Fprintln(os.Stderr, "uso: batch <input.jsonl>")
 		os.Exit(1)
 	}
 
@@ -23,11 +29,22 @@ func main() {
 
 	file, err := os.Open(inputPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to open input: %v\n", err)
+		fmt.Fprintf(os.Stderr, "erro ao abrir o arquivo de entrada: %v\n", err)
 	}
 	defer file.Close()
 
-	reader := bufio.NewReader(file)
+	stats, err := process(file)
+	if err != nil {
+		fmt.Fprintf(stderr, "erro ao processar arquivo: %v\n", err)
+	}
+
+	printStats(stdout, stats)
+
+	return 0
+}
+
+func process(r io.Reader) (Stats, error) {
+	reader := bufio.NewReader(r)
 
 	var stats Stats
 
@@ -43,20 +60,22 @@ func main() {
 		}
 
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to read input: %v\n", err)
-			os.Exit(1)
+			return stats, err
 		}
 	}
-
-	printStats(stats)
+	return stats, nil
 }
 
-func printStats(stats Stats) {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+func isJSONL(path string) bool {
+	return strings.EqualFold(filepath.Ext(path), ".jsonl")
+}
+
+func printStats(stdout io.Writer, stats Stats) {
+	w := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
 	defer w.Flush()
 
-	fmt.Fprintln(w, "Batch Results")
+	fmt.Fprintln(w, "Resultados do Batch")
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Count")
-	fmt.Fprintf(w, "Records Read\t%d\n", stats.RecordsRead)
+	fmt.Fprintln(w, "Métrica\tTotal")
+	fmt.Fprintf(w, "Registros lidos\t%d\n", stats.RecordsRead)
 }
