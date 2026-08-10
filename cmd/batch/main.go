@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +20,7 @@ type Stats struct {
 	FilteredChampionship int64
 	SerieAClubs          int64
 	SerieBclubs          int64
+	ClubRowsWritten      int64
 }
 
 type Club struct {
@@ -70,21 +72,27 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	inputPath := os.Args[1]
+	inputPath := args[0]
 
 	if !isJSONL(inputPath) {
-		fmt.Fprintf(stderr, "erro: arquivo fora da extensão .jsonl")
+		fmt.Fprintln(stderr, "erro: arquivo fora da extensão .jsonl")
 		return 1
 	}
 
-	file, err := os.Open(inputPath)
+	inputFile, err := os.Open(inputPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao abrir o arquivo de entrada: %v\n", err)
 		return 1
 	}
-	defer file.Close()
+	defer inputFile.Close()
 
-	stats, err := process(file)
+	outputFile, err := os.Create("clubs.csv")
+	if err != nil {
+		fmt.Fprintf(stderr, "erro ao criar clubs.csv: %v\n", err)
+		return 1
+	}
+
+	stats, err := process(inputFile, outputFile)
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao processar arquivo: %v\n", err)
 		return 1
@@ -95,8 +103,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func process(r io.Reader) (Stats, error) {
+func process(r io.Reader, output io.Writer) (Stats, error) {
 	reader := bufio.NewReader(r)
+
+	clubsWriter := csv.NewWriter(output)
+
+	if err := clubsWriter.Write(clubHeader); err != nil {
+		return Stats{}, err
+	}
 
 	var stats Stats
 
@@ -107,13 +121,13 @@ func process(r io.Reader) (Stats, error) {
 			stats.RecordsRead++
 
 			var club Club
+
 			if err := json.Unmarshal(line, &club); err != nil {
 				stats.MalformedRecords++
 				continue
 			} else {
 				championship, ok := filterChampionship(club.Championship)
 				if !ok {
-					fmt.Println(club.Championship)
 					stats.FilteredChampionship++
 					continue
 				}
@@ -124,6 +138,11 @@ func process(r io.Reader) (Stats, error) {
 				case "SERIE B":
 					stats.SerieBclubs++
 				}
+
+				if err := clubsWriter.Write(clubRow(club)); err != nil {
+					return stats, err
+				}
+				stats.ClubRowsWritten++
 			}
 		}
 
@@ -134,6 +153,12 @@ func process(r io.Reader) (Stats, error) {
 		if err != nil {
 			return stats, err
 		}
+	}
+
+	clubsWriter.Flush()
+
+	if err := clubsWriter.Error(); err != nil {
+		return stats, err
 	}
 	return stats, nil
 }
@@ -199,7 +224,8 @@ func printStats(stdout io.Writer, stats Stats) {
 	fmt.Fprintln(w, "Métrica\tTotal")
 	fmt.Fprintf(w, "Registros lidos\t%d\n", stats.RecordsRead)
 	fmt.Fprintf(w, "Registros Malformados\t%d\n", stats.MalformedRecords)
-	fmt.Fprintf(w, "Registros SERIE A\t%d\n", stats.SerieAClubs)
-	fmt.Fprintf(w, "Registros SERIE B\t%d\n", stats.SerieBclubs)
-	fmt.Fprintf(w, "Registros Filtrados(SEM CAMPEONATO)\t%d\n", stats.FilteredChampionship)
+	fmt.Fprintf(w, "Clubes Filtrados(SEM CAMPEONATO)\t%d\n", stats.FilteredChampionship)
+	fmt.Fprintf(w, "Clubes Série A\t%d\n", stats.SerieAClubs)
+	fmt.Fprintf(w, "Clubes Série B\t%d\n", stats.SerieBclubs)
+	fmt.Fprintf(w, "Linhas de Clubes Geradas \t%d\n", stats.ClubRowsWritten)
 }
