@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -21,6 +22,7 @@ type Stats struct {
 	SerieAClubs          int64
 	SerieBClubs          int64
 	ClubRowsWritten      int64
+	PlayerRowsWritten    int64
 }
 
 type Club struct {
@@ -62,6 +64,17 @@ type Player struct {
 	ShirtNumber *int   `json:"shirt_number"`
 }
 
+var playerHeader = []string{
+	"Id do Clube",
+	"Id do Jogador",
+	"Nome",
+	"Idade",
+	"Gols",
+	"Data de Estreia",
+	"Posição",
+	"Número da Camisa",
+}
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -86,30 +99,42 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	defer inputFile.Close()
 
-	outputFile, err := os.Create("clubs.csv")
+	clubsFile, err := os.Create("clubs.csv")
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao criar clubs.csv: %v\n", err)
 		return 1
 	}
+	defer clubsFile.Close()
 
-	stats, err := process(inputFile, outputFile)
+	playersFile, err := os.Create("players.csv")
+	if err != nil {
+		fmt.Fprintf(stderr, "erro ao criar clubs.csv: %v\n", err)
+		return 1
+	}
+	defer playersFile.Close()
+
+	stats, err := process(inputFile, clubsFile, playersFile)
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao processar arquivo: %v\n", err)
 		return 1
 	}
 
-	outputFile.Close()
 	printStats(stdout, stats)
 
 	return 0
 }
 
-func process(r io.Reader, output io.Writer) (Stats, error) {
+func process(r io.Reader, clubsOutput, playersOutput io.Writer) (Stats, error) {
 	reader := bufio.NewReader(r)
 
-	clubsWriter := csv.NewWriter(output)
+	clubsWriter := csv.NewWriter(clubsOutput)
+	playersWriter := csv.NewWriter(playersOutput)
 
 	if err := clubsWriter.Write(clubHeader); err != nil {
+		return Stats{}, err
+	}
+
+	if err := playersWriter.Write(playerHeader); err != nil {
 		return Stats{}, err
 	}
 
@@ -144,6 +169,13 @@ func process(r io.Reader, output io.Writer) (Stats, error) {
 					return stats, err
 				}
 				stats.ClubRowsWritten++
+
+				for _, player := range club.Players {
+					if err := playersWriter.Write(playerRow(club.ClubID, player)); err != nil {
+						return stats, err
+					}
+					stats.PlayerRowsWritten++
+				}
 			}
 		}
 
@@ -157,8 +189,12 @@ func process(r io.Reader, output io.Writer) (Stats, error) {
 	}
 
 	clubsWriter.Flush()
-
 	if err := clubsWriter.Error(); err != nil {
+		return stats, err
+	}
+
+	playersWriter.Flush()
+	if err := playersWriter.Error(); err != nil {
 		return stats, err
 	}
 	return stats, nil
@@ -186,6 +222,19 @@ func clubRow(club Club) []string {
 	}
 }
 
+func playerRow(clubID string, player Player) []string {
+	return []string{
+		clubID,
+		player.PlayerID,
+		player.Name,
+		intValue(player.Age),
+		intValue(player.Goals),
+		normalizeDate(player.DebutDate),
+		player.Position,
+		intValue(player.ShirtNumber),
+	}
+}
+
 // HELPERS
 func isJSONL(path string) bool {
 	return strings.EqualFold(filepath.Ext(path), ".jsonl")
@@ -200,6 +249,14 @@ func filterChampionship(value string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func intValue(value *int) string {
+	if value == nil {
+		return ""
+	}
+
+	return strconv.Itoa(*value)
 }
 
 func normalizeDate(value string) string {
@@ -229,4 +286,5 @@ func printStats(stdout io.Writer, stats Stats) {
 	fmt.Fprintf(w, "Clubes Série A\t%d\n", stats.SerieAClubs)
 	fmt.Fprintf(w, "Clubes Série B\t%d\n", stats.SerieBClubs)
 	fmt.Fprintf(w, "Linhas de Clubes Geradas \t%d\n", stats.ClubRowsWritten)
+	fmt.Fprintf(w, "Linhas de Jogadores Geradas \t%d\n", stats.PlayerRowsWritten)
 }
