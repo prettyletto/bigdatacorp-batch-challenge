@@ -20,8 +20,8 @@ func main() {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
-	if len(os.Args) != 1 {
-		fmt.Fprintln(os.Stderr, "uso: batch <input.jsonl>")
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "uso: batch <input.jsonl>")
 		os.Exit(1)
 	}
 
@@ -29,7 +29,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	file, err := os.Open(inputPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "erro ao abrir o arquivo de entrada: %v\n", err)
+		fmt.Fprintf(stderr, "erro ao abrir o arquivo de entrada: %v\n", err)
 	}
 	defer file.Close()
 
