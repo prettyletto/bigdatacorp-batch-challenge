@@ -13,8 +13,11 @@ import (
 )
 
 type Stats struct {
-	RecordsRead      int64
-	MalformedRecords int64
+	RecordsRead          int64
+	MalformedRecords     int64
+	FilteredChampionship int64
+	SerieAClubs          int64
+	SerieBclubs          int64
 }
 
 type Club struct {
@@ -92,6 +95,20 @@ func process(r io.Reader) (Stats, error) {
 			if err := json.Unmarshal(line, &club); err != nil {
 				stats.MalformedRecords++
 				continue
+			} else {
+				championship, ok := filterChampionship(club.Championship)
+				if !ok {
+					fmt.Println(club.Championship)
+					stats.FilteredChampionship++
+					continue
+				}
+
+				switch championship {
+				case "SERIE A":
+					stats.SerieAClubs++
+				case "SERIE B":
+					stats.SerieBclubs++
+				}
 			}
 		}
 
@@ -106,8 +123,20 @@ func process(r io.Reader) (Stats, error) {
 	return stats, nil
 }
 
+// HELPERS
 func isJSONL(path string) bool {
 	return strings.EqualFold(filepath.Ext(path), ".jsonl")
+}
+
+func filterChampionship(value string) (string, bool) {
+	championship := strings.TrimSpace(value)
+
+	switch championship {
+	case "SERIE A", "SERIE B":
+		return championship, true
+	default:
+		return "", false
+	}
 }
 
 func printStats(stdout io.Writer, stats Stats) {
@@ -118,5 +147,8 @@ func printStats(stdout io.Writer, stats Stats) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Métrica\tTotal")
 	fmt.Fprintf(w, "Registros lidos\t%d\n", stats.RecordsRead)
-	fmt.Fprintf(w,"Registros Malformados\t%d\n", stats.MalformedRecords)
+	fmt.Fprintf(w, "Registros Malformados\t%d\n", stats.MalformedRecords)
+	fmt.Fprintf(w, "Registros SERIE A\t%d\n", stats.SerieAClubs)
+	fmt.Fprintf(w, "Registros SERIE B\t%d\n", stats.SerieBclubs)
+	fmt.Fprintf(w, "Registros Filtrados(SEM CAMPEONATO)\t%d\n", stats.FilteredChampionship)
 }
