@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +13,33 @@ import (
 )
 
 type Stats struct {
-	RecordsRead int64
+	RecordsRead      int64
+	MalformedRecords int64
+}
+
+type Club struct {
+	ClubID       string   `json:"club_id"`
+	Name         string   `json:"name"`
+	Championship string   `json:"championship"`
+	FoundingDate string   `json:"founding_date"`
+	City         string   `json:"city"`
+	State        string   `json:"state"`
+	Country      string   `json:"country"`
+	Stadium      string   `json:"stadium"`
+	President    string   `json:"president"`
+	Nickname     *string  `json:"nickname"`
+	Players      []Player `json:"players"`
+	Colors       []string `json:"colors"`
+}
+
+type Player struct {
+	PlayerID    string `json:"player_id"`
+	Name        string `json:"name"`
+	Age         *int   `json:"age"`
+	Goals       *int   `json:"goals"`
+	DebutDate   string `json:"debut_date"`
+	Position    string `json:"position"`
+	ShirtNumber *int   `json:"shirt_number"`
 }
 
 func main() {
@@ -60,6 +87,11 @@ func process(r io.Reader) (Stats, error) {
 
 		if len(line) > 0 {
 			stats.RecordsRead++
+
+			var club Club
+			if err := json.Unmarshal(line, &club); err != nil {
+				stats.MalformedRecords++
+			}
 		}
 
 		if errors.Is(err, io.EOF) {
