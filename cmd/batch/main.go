@@ -91,6 +91,7 @@ func process(r io.Reader) (Stats, error) {
 			var club Club
 			if err := json.Unmarshal(line, &club); err != nil {
 				stats.MalformedRecords++
+				continue
 			}
 		}
 
@@ -117,4 +118,5 @@ func printStats(stdout io.Writer, stats Stats) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Métrica\tTotal")
 	fmt.Fprintf(w, "Registros lidos\t%d\n", stats.RecordsRead)
+	fmt.Fprintf(w,"Registros Malformados\t%d\n", stats.MalformedRecords)
 }
