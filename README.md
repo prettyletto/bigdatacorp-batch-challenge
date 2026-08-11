@@ -78,3 +78,13 @@ Resultados obtidos nesta máquina:
 | 10M | 1:49.43 | 0:39.75 | 63.7% | 2.75x | 10.5 MiB | 21.1 MiB | 103% -> 443% |
 
 O [relatório completo](assets/benchmark-workers.md) preserva o contexto e indica como reproduzir a medição.
+
+
+## Uso de IA
+
+O diretório `AI/` contém o registro da sessão de IA utilizada durante o desenvolvimento do desafio, disponibilizado em dois formatos:
+
+* `AI/sessao_json_raw.json`: transcrição bruta da sessão em JSON.
+* `AI/sessao_readable_para_humanos.md`: versão da mesma sessão formatada para leitura humana.
+
+Esses arquivos foram incluídos para manter transparência sobre o uso de ferramentas de IA durante a implementação.
