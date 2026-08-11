@@ -72,7 +72,25 @@ O utilitário abaixo cria uma entrada JSONL determinística para testes locais. 
 go run ./cmd/generate -records 1000000 -players 2 -output .local/1m.jsonl
 ```
 
+
+## Onde o paralelismo ajuda
+
+Para identificar onde o paralelismo realmente reduz o tempo de execução, foram medidos separadamente leitura, processamento e escrita usando 1 milhão de clubes com 26 jogadores por clube.
+
+| Workers | Leitura | Processamento | Escrita | Tempo total |
+| ------: | ------: | ------------: | ------: | ----------: |
+|       1 |     10s |         1m25s |      5s |       1m41s |
+|       2 |     10s |           48s |      6s |       1m04s |
+|       4 |     10s |           27s |      6s |         44s |
+|       8 |     10s |           18s |      6s |         34s |
+|      16 |      8s |           17s |      7s |         32s |
+
+O tempo reduzível está principalmente no **processamento**: de `1m25s` com 1 worker para `18s` com 8. Já leitura e escrita permanecem próximas de `10s` e `6s`, respectivamente, independentemente da quantidade de workers.
+
+Por isso, aumentar os workers melhora principalmente o processamento. A partir de 8 workers, o ganho diminui bastante, pois leitura e escrita continuam essencialmente sequenciais e o próprio processamento já apresenta pouco ganho adicional.
+
 ## Benchmark
+
 
 O script `scripts/benchmark-workers.sh` gera uma única entrada de 1 milhão de clubes, com 26 jogadores por clube, e executa o batch com `1`, `2`, `4`, `8` e `16` workers nessa ordem. A compilação, a geração, o aquecimento do cache da entrada e a comparação byte a byte ficam fora da medição.
 
