@@ -95,11 +95,11 @@ Resultados obtidos nesta máquina com 1 milhão de clubes e 26 jogadores por clu
 
 | Workers | Tempo decorrido | Memória máxima (RSS) | Ganho em relação ao anterior |
 | ---: | ---: | ---: | ---: |
-| 1 | 1:21.56 | 19.4 MiB | base |
-| 2 | 0:50.62 | 29.4 MiB | 37.9% mais rápido |
-| 4 | 0:35.43 | 46.3 MiB | 30.0% mais rápido |
-| 8 | 0:29.53 | 83.7 MiB | 16.7% mais rápido |
-| 16 | 0:27.49 | 132.8 MiB | 6.9% mais rápido |
+| 1 | 1m21s | 19.4 MiB | base |
+| 2 | 50s | 29.4 MiB | 37.9% mais rápido |
+| 4 | 35s | 46.3 MiB | 30.0% mais rápido |
+| 8 | 29s | 83.7 MiB | 16.7% mais rápido |
+| 16 | 27s | 132.8 MiB | 6.9% mais rápido |
 
 Nesta execução, todos os aumentos de workers reduziram o tempo. O relatório local em `.local/benchmark-workers/report.md` preserva a mesma tabela.
 
