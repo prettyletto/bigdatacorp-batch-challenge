@@ -131,13 +131,13 @@ func TestRunVerboseLogsProgressAndInvalidRecords(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %q", code, stderr.String())
 	}
-	for _, message := range []string{"Processamento", "Malformados", "Ignorados"} {
+	for _, message := range []string{"Processamento", "Malformados", "Ignorados", "Registro", "malformado:", "invalid character"} {
 		if !strings.Contains(stderr.String(), message) {
 			t.Fatalf("expected %q in verbose stderr, got %q", message, stderr.String())
 		}
 	}
 	if strings.Contains(stderr.String(), "Linha malformada") || strings.Contains(stderr.String(), "Clube ignorado") {
-		t.Fatalf("verbose stderr should contain aggregate logs only, got %q", stderr.String())
+		t.Fatalf("verbose stderr should contain only malformed record details, got %q", stderr.String())
 	}
 	if strings.Contains(stderr.String(), malformedPayload) {
 		t.Fatal("verbose stderr should not include malformed JSON content")

@@ -168,6 +168,10 @@ func newProgressLogger(stderr io.Writer, inputSize int64) func(batch.Progress) {
 	var nextPercent int64 = 10
 
 	return func(progress batch.Progress) {
+		if progress.MalformedError != "" {
+			fmt.Fprintf(w, "Registro\t%d\tmalformado:\t%s\n", progress.RecordsRead, progress.MalformedError)
+		}
+
 		if inputSize > 0 && inputSize < 100_000 {
 			percent := progress.BytesRead * 100 / inputSize
 			if percent >= nextPercent {

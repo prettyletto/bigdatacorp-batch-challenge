@@ -17,6 +17,7 @@ type Progress struct {
 	BytesRead        int64
 	MalformedRecords int64
 	SkippedClubs     int64
+	MalformedError   string
 }
 
 func Process(r io.Reader, clubsOutput, playersOutput io.Writer) (Stats, error) {
@@ -80,7 +81,7 @@ func ProcessWithOptions(r io.Reader, clubsOutput, playersOutput io.Writer, optio
 	return stats, nil
 }
 
-func reportProgress(onProgress func(Progress), stats Stats, bytesRead int64) {
+func reportProgress(onProgress func(Progress), stats Stats, bytesRead int64, malformedError string) {
 	if onProgress == nil {
 		return
 	}
@@ -90,6 +91,7 @@ func reportProgress(onProgress func(Progress), stats Stats, bytesRead int64) {
 		BytesRead:        bytesRead,
 		MalformedRecords: stats.MalformedRecords,
 		SkippedClubs:     stats.FilteredChampionship,
+		MalformedError:   malformedError,
 	})
 }
 

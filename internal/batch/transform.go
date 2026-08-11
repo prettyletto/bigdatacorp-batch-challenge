@@ -33,8 +33,9 @@ var playerHeader = []string{
 }
 
 type processedRecord struct {
-	malformed bool
-	filtered  bool
+	malformed      bool
+	malformedError string
+	filtered       bool
 
 	championship string
 	clubRow      []string
@@ -46,7 +47,8 @@ func processLine(line []byte) processedRecord {
 
 	if err := json.Unmarshal(line, &club); err != nil {
 		return processedRecord{
-			malformed: true,
+			malformed:      true,
+			malformedError: err.Error(),
 		}
 	}
 

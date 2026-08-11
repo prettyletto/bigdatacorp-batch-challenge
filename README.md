@@ -23,7 +23,7 @@ go run ./cmd/batch -workers 8 -maxsize 16 sample_clubes.jsonl
 
 Um registro individual maior que o limite continua sendo processado normalmente. O limite controla o acúmulo de registros por batch.
 
-Use `-v` para acompanhar o processamento em `stderr`. Em arquivos com 100 kB ou mais, o progresso é exibido a cada 100 mil registros. Em arquivos menores, ele é exibido a cada 10% dos bytes processados. Cada linha reúne o total processado, o total de JSONs malformados e o total de clubes ignorados.
+Use `-v` para acompanhar o processamento em `stderr`. Em arquivos com 100 kB ou mais, o progresso é exibido a cada 100 mil registros. Em arquivos menores, ele é exibido a cada 10% dos bytes processados. Cada linha reúne o total processado, o total de JSONs malformados e o total de clubes ignorados. Para JSON malformado, o log informa o número do registro e o erro de parsing, sem imprimir o conteúdo da linha.
 
 ```bash
 go run ./cmd/batch -v -workers 8 -maxsize 16 sample_clubes.jsonl 2> processamento.log

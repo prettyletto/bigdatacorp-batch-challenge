@@ -34,7 +34,7 @@ func processSequential(
 			}
 
 			bytesRead += int64(len(line))
-			reportProgress(onProgress, stats, bytesRead)
+			reportProgress(onProgress, stats, bytesRead, record.malformedError)
 		}
 
 		if errors.Is(readErr, io.EOF) {

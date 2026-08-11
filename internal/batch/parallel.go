@@ -43,7 +43,7 @@ func processParallel(
 				}
 
 				bytesRead += int64(len(lines[index]))
-				reportProgress(onProgress, stats, bytesRead)
+				reportProgress(onProgress, stats, bytesRead, record.malformedError)
 			}
 		}
 		if eof {

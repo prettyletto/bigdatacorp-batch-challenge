@@ -225,11 +225,20 @@ func TestProcessWithOptionsReportsOrderedProgress(t *testing.T) {
 	if progress[0].MalformedRecords != 0 || progress[0].SkippedClubs != 0 {
 		t.Fatalf("first event = %+v, want no malformed or skipped records", progress[0])
 	}
+	if progress[0].MalformedError != "" {
+		t.Fatalf("first event error = %q, want empty error", progress[0].MalformedError)
+	}
 	if progress[1].MalformedRecords != 1 || progress[1].SkippedClubs != 0 {
 		t.Fatalf("second event = %+v, want one malformed record", progress[1])
 	}
+	if progress[1].MalformedError == "" {
+		t.Fatal("second event should include the JSON parsing error")
+	}
 	if progress[2].MalformedRecords != 1 || progress[2].SkippedClubs != 1 {
 		t.Fatalf("third event = %+v, want one malformed and one skipped record", progress[2])
+	}
+	if progress[2].MalformedError != "" {
+		t.Fatalf("third event error = %q, want empty error", progress[2].MalformedError)
 	}
 }
 
