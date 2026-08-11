@@ -10,7 +10,7 @@ import (
 
 const (
 	recordsPerWorkerBatch = 512
-	maxBytes              = 32 << 20
+	defaultMaxBatchBytes  = 32 << 20
 )
 
 func processParallel(
@@ -18,6 +18,7 @@ func processParallel(
 	clubsWriter *csv.Writer,
 	playersWriter *csv.Writer,
 	workers int,
+	maxBatchBytes int,
 ) (Stats, error) {
 	reader := bufio.NewReader(r)
 
@@ -26,7 +27,7 @@ func processParallel(
 	batchSize := workers * recordsPerWorkerBatch
 
 	for {
-		lines, eof, err := readBatch(reader, batchSize, maxBytes)
+		lines, eof, err := readBatch(reader, batchSize, maxBatchBytes)
 		if err != nil {
 			return stats, err
 		}

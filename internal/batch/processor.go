@@ -7,7 +7,8 @@ import (
 )
 
 type Options struct {
-	Workers int
+	Workers       int
+	MaxBatchBytes int
 }
 
 func Process(r io.Reader, clubsOutput, playersOutput io.Writer) (Stats, error) {
@@ -22,6 +23,14 @@ func ProcessWithOptions(r io.Reader, clubsOutput, playersOutput io.Writer, optio
 
 	if workers < 1 {
 		return Stats{}, fmt.Errorf("Workers deve ser maior que zero.")
+	}
+
+	maxBatchBytes := options.MaxBatchBytes
+	if maxBatchBytes == 0 {
+		maxBatchBytes = defaultMaxBatchBytes
+	}
+	if maxBatchBytes < 1 {
+		return Stats{}, fmt.Errorf("MaxBatchBytes deve ser maior que zero.")
 	}
 
 	clubsWriter := csv.NewWriter(clubsOutput)
@@ -43,7 +52,7 @@ func ProcessWithOptions(r io.Reader, clubsOutput, playersOutput io.Writer, optio
 	if workers == 1 {
 		stats, err = processSequential(r, clubsWriter, playersWriter)
 	} else {
-		stats, err = processParallel(r, clubsWriter, playersWriter, workers)
+		stats, err = processParallel(r, clubsWriter, playersWriter, workers, maxBatchBytes)
 	}
 
 	if err != nil {

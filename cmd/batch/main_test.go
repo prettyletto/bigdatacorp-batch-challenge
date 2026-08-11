@@ -71,7 +71,7 @@ func TestRunGeneratesCSVFilesFromSample(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := run([]string{inputPath}, &stdout, &stderr)
+	code := run([]string{"-workers", "2", "-maxsize", "1", inputPath}, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, stderr = %q", code, stderr.String())
@@ -86,6 +86,20 @@ func TestRunGeneratesCSVFilesFromSample(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Registros lidos") {
 		t.Fatalf("expected statistics in stdout, got %q", stdout.String())
+	}
+}
+
+func TestRunRejectsInvalidMaxSize(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"-maxsize", "0", "sample_clubes.jsonl"}, &stdout, &stderr)
+
+	if code == 0 {
+		t.Fatal("expected a non-zero exit code")
+	}
+	if !strings.Contains(stderr.String(), "maxsize") {
+		t.Fatalf("expected maxsize error, got %q", stderr.String())
 	}
 }
 

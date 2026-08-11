@@ -29,17 +29,26 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	flags.SetOutput(stderr)
 
-	var workers int
+	var (
+		workers int
+		maxSize int
+	)
 
 	flags.IntVar(
 		&workers,
 		"workers",
 		1,
-		"quantidadede workers para processamento",
+		"quantidade de workers para processamento",
+	)
+	flags.IntVar(
+		&maxSize,
+		"maxsize",
+		32,
+		"tamanho máximo do batch em MiB",
 	)
 
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "uso: batch [-workers N] <input.jsonl>")
+		fmt.Fprintln(stderr, "uso: batch [-workers N] [-maxsize MiB] <input.jsonl>")
 	}
 
 	if err := flags.Parse(args); err != nil {
@@ -53,6 +62,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	if workers < 1 {
 		fmt.Fprintln(stderr, "erro: workers deve ser maior que zero")
+		return 1
+	}
+	if maxSize < 1 {
+		fmt.Fprintln(stderr, "erro: maxsize deve ser maior que zero")
 		return 1
 	}
 
@@ -84,7 +97,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	defer playersOutput.Discard()
 
-	stats, err := batch.ProcessWithOptions(inputFile, clubsOutput.file, playersOutput.file, batch.Options{Workers: workers})
+	stats, err := batch.ProcessWithOptions(inputFile, clubsOutput.file, playersOutput.file, batch.Options{
+		Workers:       workers,
+		MaxBatchBytes: maxSize << 20,
+	})
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao processar arquivo: %v\n", err)
 		return 1

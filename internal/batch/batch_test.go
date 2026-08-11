@@ -118,16 +118,45 @@ func TestProcessWithWorkersMatchesSequentialOutputAcrossBatches(t *testing.T) {
 	}
 }
 
+func TestProcessWithWorkersRespectsMaxBatchBytes(t *testing.T) {
+	input := workerTestInput(32)
+	sequentialStats, sequentialClubs, sequentialPlayers := processWithWorkers(t, input, 1)
+
+	var clubsOutput bytes.Buffer
+	var playersOutput bytes.Buffer
+	parallelStats, err := ProcessWithOptions(
+		strings.NewReader(input),
+		&clubsOutput,
+		&playersOutput,
+		Options{Workers: 8, MaxBatchBytes: 1},
+	)
+
+	if err != nil {
+		t.Fatalf("ProcessWithOptions returned error: %v", err)
+	}
+	if parallelStats != sequentialStats {
+		t.Fatalf("parallel stats = %+v, want sequential stats %+v", parallelStats, sequentialStats)
+	}
+	if clubsOutput.String() != sequentialClubs {
+		t.Fatal("clubs CSV differs when the max batch size is limited")
+	}
+	if playersOutput.String() != sequentialPlayers {
+		t.Fatal("players CSV differs when the max batch size is limited")
+	}
+}
+
 func TestProcessWithOptionsHandlesWorkerCounts(t *testing.T) {
 	for _, tt := range []struct {
-		name    string
-		workers int
-		wantErr bool
+		name          string
+		workers       int
+		maxBatchBytes int
+		wantErr       bool
 	}{
 		{name: "zero uses sequential processing", workers: 0},
 		{name: "one worker", workers: 1},
 		{name: "more workers than records", workers: 8},
 		{name: "negative worker count", workers: -1, wantErr: true},
+		{name: "negative max batch size", workers: 8, maxBatchBytes: -1, wantErr: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var clubsOutput bytes.Buffer
@@ -136,7 +165,7 @@ func TestProcessWithOptionsHandlesWorkerCounts(t *testing.T) {
 				strings.NewReader(`{"club_id":"SCCP","championship":"SERIE A","players":[{"player_id":"SCCP-10"}]}`),
 				&clubsOutput,
 				&playersOutput,
-				Options{Workers: tt.workers},
+				Options{Workers: tt.workers, MaxBatchBytes: tt.maxBatchBytes},
 			)
 
 			if tt.wantErr {

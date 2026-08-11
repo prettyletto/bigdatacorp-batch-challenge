@@ -15,11 +15,13 @@ São incluídos apenas clubes de `SERIE A` e `SERIE B`. Campos ausentes ou nulos
 go run ./cmd/batch sample_clubes.jsonl
 ```
 
-Para processar em paralelo, informe a quantidade de workers. O padrão é `1`.
+Para processar em paralelo, informe a quantidade de workers. O padrão é `1`. A opção `-maxsize` controla o tamanho máximo de cada batch em memória, em MiB; o padrão é `32`.
 
 ```bash
-go run ./cmd/batch -workers 8 sample_clubes.jsonl
+go run ./cmd/batch -workers 8 -maxsize 16 sample_clubes.jsonl
 ```
+
+Um registro individual maior que o limite continua sendo processado normalmente. O limite controla o acúmulo de registros por batch.
 
 Os arquivos `clubs.csv` e `players.csv` são gravados no diretório atual. A escrita de cada CSV é atômica: em caso de erro durante o processamento, o arquivo final anterior é preservado.
 
@@ -27,7 +29,7 @@ Exemplo com binário compilado:
 
 ```bash
 go build -o batch ./cmd/batch
-./batch -workers 8 caminho/para/clubes.jsonl
+./batch -workers 8 -maxsize 32 caminho/para/clubes.jsonl
 ```
 
 ## Saída
