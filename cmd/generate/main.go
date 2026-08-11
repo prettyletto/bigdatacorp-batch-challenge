@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 type Club struct {
@@ -85,6 +86,12 @@ func main() {
 }
 
 func generate(path string, records, playersPerClub int) error {
+	dir := filepath.Dir(path)
+
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("criando diretório de saída: %w", err)
+	}
+
 	file, err := os.Create(path)
 	if err != nil {
 		return err
@@ -108,7 +115,7 @@ func generate(path string, records, playersPerClub int) error {
 }
 
 func makeClub(index, playersPerClub int) Club {
-	clubID := fmt.Sprintf("CLUB-%08%", index)
+	clubID := fmt.Sprintf("CLUB-%08d", index)
 
 	championship := "SERIE A"
 
