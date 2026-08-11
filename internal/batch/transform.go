@@ -59,10 +59,13 @@ func processLine(line []byte) processedRecord {
 		}
 	}
 
-	playerRows := make([][]string, len(club.Players))
+	var playerRows [][]string
+	if strings.TrimSpace(club.ClubID) != "" {
+		playerRows = make([][]string, len(club.Players))
 
-	for i, player := range club.Players {
-		playerRows[i] = playerRow(club.ClubID, player)
+		for i, player := range club.Players {
+			playerRows[i] = playerRow(club.ClubID, player)
+		}
 	}
 
 	return processedRecord{

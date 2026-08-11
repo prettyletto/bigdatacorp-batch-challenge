@@ -206,17 +206,20 @@ func TestAtomicOutputDiscardPreservesDestination(t *testing.T) {
 
 func TestIsJSONL(t *testing.T) {
 	for _, tt := range []struct {
+		name string
 		path string
 		want bool
 	}{
-		{path: "clubes.jsonl", want: true},
-		{path: "CLUBES.JSONL", want: true},
-		{path: "clubes", want: false},
-		{path: "clubes.json", want: false},
+		{name: "extensao minuscula", path: "clubes.jsonl", want: true},
+		{name: "extensao maiuscula", path: "CLUBES.JSONL", want: true},
+		{name: "sem extensao", path: "clubes", want: false},
+		{name: "extensao diferente", path: "clubes.json", want: false},
 	} {
-		if got := isJSONL(tt.path); got != tt.want {
-			t.Fatalf("isJSONL(%q) = %t, want %t", tt.path, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isJSONL(tt.path); got != tt.want {
+				t.Fatalf("isJSONL(%q) = %t, want %t", tt.path, got, tt.want)
+			}
+		})
 	}
 }
 

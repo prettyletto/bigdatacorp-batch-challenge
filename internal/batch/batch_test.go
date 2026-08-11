@@ -23,20 +23,23 @@ func (errorWriter) Write([]byte) (int, error) {
 
 func TestFilterChampionship(t *testing.T) {
 	for _, tt := range []struct {
+		name  string
 		value string
 		want  string
 		ok    bool
 	}{
-		{value: "SERIE A", want: "SERIE A", ok: true},
-		{value: "SERIE B", want: "SERIE B", ok: true},
-		{value: "  SERIE A  ", want: "SERIE A", ok: true},
-		{value: "SERIE C"},
-		{value: ""},
+		{name: "serie A", value: "SERIE A", want: "SERIE A", ok: true},
+		{name: "serie B", value: "SERIE B", want: "SERIE B", ok: true},
+		{name: "espacos ao redor", value: "  SERIE A  ", want: "SERIE A", ok: true},
+		{name: "serie C", value: "SERIE C"},
+		{name: "ausente", value: ""},
 	} {
-		got, ok := filterChampionship(tt.value)
-		if got != tt.want || ok != tt.ok {
-			t.Fatalf("filterChampionship(%q) = (%q, %t), want (%q, %t)", tt.value, got, ok, tt.want, tt.ok)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := filterChampionship(tt.value)
+			if got != tt.want || ok != tt.ok {
+				t.Fatalf("filterChampionship(%q) = (%q, %t), want (%q, %t)", tt.value, got, ok, tt.want, tt.ok)
+			}
+		})
 	}
 }
 
@@ -92,29 +95,37 @@ func TestProcessReadsSampleFile(t *testing.T) {
 	if stats != wantStats {
 		t.Fatalf("stats = %+v, want %+v", stats, wantStats)
 	}
-	if got := readCSV(t, clubsOutput.String()); len(got) != 6 {
-		t.Fatalf("clubs rows = %d, want 6", len(got))
+	clubsRows := readCSV(t, clubsOutput.String())
+	if len(clubsRows) != 6 {
+		t.Fatalf("clubs rows = %d, want 6", len(clubsRows))
 	}
-	if got := readCSV(t, playersOutput.String()); len(got) != 9 {
-		t.Fatalf("players rows = %d, want 9", len(got))
+	if clubsRows[1][4] != "São Paulo" {
+		t.Fatalf("club city = %q, want UTF-8 value", clubsRows[1][4])
+	}
+	playersRows := readCSV(t, playersOutput.String())
+	if len(playersRows) != 9 {
+		t.Fatalf("players rows = %d, want 9", len(playersRows))
+	}
+	if playersRows[5][2] != "Estêvão" {
+		t.Fatalf("player name = %q, want UTF-8 value", playersRows[5][2])
 	}
 }
 
-func TestProcessWithWorkersMatchesSequentialOutputAcrossBatches(t *testing.T) {
+func TestProcessWithOneAndManyWorkersMatchAcrossBatches(t *testing.T) {
 	const records = recordsPerWorkerBatch*8 + 1
 	input := workerTestInput(records)
 
-	sequentialStats, sequentialClubs, sequentialPlayers := processWithWorkers(t, input, 1)
+	oneWorkerStats, oneWorkerClubs, oneWorkerPlayers := processWithWorkers(t, input, 1)
 	parallelStats, parallelClubs, parallelPlayers := processWithWorkers(t, input, 8)
 
-	if parallelStats != sequentialStats {
-		t.Fatalf("parallel stats = %+v, want sequential stats %+v", parallelStats, sequentialStats)
+	if parallelStats != oneWorkerStats {
+		t.Fatalf("parallel stats = %+v, want one-worker stats %+v", parallelStats, oneWorkerStats)
 	}
-	if parallelClubs != sequentialClubs {
-		t.Fatal("clubs CSV differs between sequential and parallel processing")
+	if parallelClubs != oneWorkerClubs {
+		t.Fatal("clubs CSV differs between one-worker and parallel processing")
 	}
-	if parallelPlayers != sequentialPlayers {
-		t.Fatal("players CSV differs between sequential and parallel processing")
+	if parallelPlayers != oneWorkerPlayers {
+		t.Fatal("players CSV differs between one-worker and parallel processing")
 	}
 }
 
@@ -345,6 +356,53 @@ func TestProcessWritesPlayersOnlyForEligibleClubs(t *testing.T) {
 	if got := readCSV(t, playersOutput.String()); !slices.EqualFunc(got, wantRows, slices.Equal[[]string]) {
 		t.Fatalf("players rows = %#v, want %#v", got, wantRows)
 	}
+	clubsRows := readCSV(t, clubsOutput.String())
+	if got, want := []string{clubsRows[1][0], clubsRows[2][0]}, []string{"SCCP", "AVA"}; !slices.Equal(got, want) {
+		t.Fatalf("clubs rows = %#v, want only eligible clubs %#v", got, want)
+	}
+}
+
+func TestProcessSkipsPlayersWithoutClubID(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		input      string
+		wantClubID string
+	}{
+		{
+			name:  "club ID ausente",
+			input: `{"championship":"SERIE A","players":[{"player_id":"PLAYER-1"}]}`,
+		},
+		{
+			name:  "club ID nulo",
+			input: `{"club_id":null,"championship":"SERIE A","players":[{"player_id":"PLAYER-1"}]}`,
+		},
+		{
+			name:       "club ID com espacos",
+			input:      `{"club_id":"  ","championship":"SERIE A","players":[{"player_id":"PLAYER-1"}]}`,
+			wantClubID: "  ",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var clubsOutput bytes.Buffer
+			var playersOutput bytes.Buffer
+			stats, err := Process(strings.NewReader(tt.input), &clubsOutput, &playersOutput)
+
+			if err != nil {
+				t.Fatalf("Process returned error: %v", err)
+			}
+			wantStats := Stats{RecordsRead: 1, SerieAClubs: 1, ClubRowsWritten: 1}
+			if stats != wantStats {
+				t.Fatalf("stats = %+v, want %+v", stats, wantStats)
+			}
+			clubsRows := readCSV(t, clubsOutput.String())
+			if len(clubsRows) != 2 || clubsRows[1][0] != tt.wantClubID {
+				t.Fatalf("clubs rows = %#v, want one club row with ID %q", clubsRows, tt.wantClubID)
+			}
+			if playersRows := readCSV(t, playersOutput.String()); len(playersRows) != 1 {
+				t.Fatalf("players rows = %#v, want only the header", playersRows)
+			}
+		})
+	}
 }
 
 func TestProcessEscapesCSVFields(t *testing.T) {
@@ -365,19 +423,22 @@ func TestProcessEscapesCSVFields(t *testing.T) {
 
 func TestProcessReturnsOutputErrors(t *testing.T) {
 	for _, tt := range []struct {
+		name          string
 		clubsOutput   io.Writer
 		playersOutput io.Writer
 	}{
-		{clubsOutput: errorWriter{}, playersOutput: &bytes.Buffer{}},
-		{clubsOutput: &bytes.Buffer{}, playersOutput: errorWriter{}},
+		{name: "clubs.csv", clubsOutput: errorWriter{}, playersOutput: &bytes.Buffer{}},
+		{name: "players.csv", clubsOutput: &bytes.Buffer{}, playersOutput: errorWriter{}},
 	} {
-		stats, err := Process(strings.NewReader(""), tt.clubsOutput, tt.playersOutput)
-		if !errors.Is(err, errOutputUnavailable) {
-			t.Fatalf("error = %v, want output writer error", err)
-		}
-		if stats != (Stats{}) {
-			t.Fatalf("stats = %+v, want empty stats", stats)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			stats, err := Process(strings.NewReader(""), tt.clubsOutput, tt.playersOutput)
+			if !errors.Is(err, errOutputUnavailable) {
+				t.Fatalf("error = %v, want output writer error", err)
+			}
+			if stats != (Stats{}) {
+				t.Fatalf("stats = %+v, want empty stats", stats)
+			}
+		})
 	}
 }
 
@@ -400,32 +461,41 @@ func TestPlayerRowHandlesEmptyAndZeroValues(t *testing.T) {
 }
 
 func TestNormalizeDate(t *testing.T) {
-	for _, tt := range []struct{ value, want string }{
-		{value: "1910-09-01", want: "1910-09-01"},
-		{value: " 1910-09-01 ", want: "1910-09-01"},
-		{value: "1910-09-31"},
-		{value: "01/09/1910"},
-		{value: ""},
+	for _, tt := range []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "valida", value: "1910-09-01", want: "1910-09-01"},
+		{name: "espacos ao redor", value: " 1910-09-01 ", want: "1910-09-01"},
+		{name: "dia invalido", value: "1910-09-31"},
+		{name: "formato invalido", value: "01/09/1910"},
+		{name: "ausente", value: ""},
 	} {
-		if got := normalizeDate(tt.value); got != tt.want {
-			t.Fatalf("normalizeDate(%q) = %q, want %q", tt.value, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeDate(tt.value); got != tt.want {
+				t.Fatalf("normalizeDate(%q) = %q, want %q", tt.value, got, tt.want)
+			}
+		})
 	}
 }
 
 func TestIntValue(t *testing.T) {
 	zero := 0
 	for _, tt := range []struct {
+		name  string
 		value *int
 		want  string
 	}{
-		{value: nil, want: ""},
-		{value: &zero, want: "0"},
-		{value: intPointer(42), want: "42"},
+		{name: "nulo", value: nil, want: ""},
+		{name: "zero", value: &zero, want: "0"},
+		{name: "positivo", value: intPointer(42), want: "42"},
 	} {
-		if got := intValue(tt.value); got != tt.want {
-			t.Fatalf("intValue(%v) = %q, want %q", tt.value, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			if got := intValue(tt.value); got != tt.want {
+				t.Fatalf("intValue(%v) = %q, want %q", tt.value, got, tt.want)
+			}
+		})
 	}
 }
 

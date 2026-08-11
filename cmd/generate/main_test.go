@@ -39,17 +39,19 @@ func TestGenerateCreatesRequestedRecordsAndParentDirectory(t *testing.T) {
 		t.Fatalf("generated clubs = %d, want 3", len(clubs))
 	}
 	for index, wantChampionship := range []string{"SERIE A", "SERIE B", "SERIE C"} {
-		club := clubs[index]
-		wantID := []string{"CLUB-00000000", "CLUB-00000001", "CLUB-00000002"}[index]
-		if club.ClubID != wantID {
-			t.Fatalf("club ID = %q, want %q", club.ClubID, wantID)
-		}
-		if club.Championship != wantChampionship {
-			t.Fatalf("championship = %q, want %q", club.Championship, wantChampionship)
-		}
-		if len(club.Players) != 2 {
-			t.Fatalf("players = %d, want 2", len(club.Players))
-		}
+		t.Run(wantChampionship, func(t *testing.T) {
+			club := clubs[index]
+			wantID := []string{"CLUB-00000000", "CLUB-00000001", "CLUB-00000002"}[index]
+			if club.ClubID != wantID {
+				t.Fatalf("club ID = %q, want %q", club.ClubID, wantID)
+			}
+			if club.Championship != wantChampionship {
+				t.Fatalf("championship = %q, want %q", club.Championship, wantChampionship)
+			}
+			if len(club.Players) != 2 {
+				t.Fatalf("players = %d, want 2", len(club.Players))
+			}
+		})
 	}
 }
 

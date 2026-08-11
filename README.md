@@ -54,10 +54,26 @@ Os valores CSV são escapados pelo padrão RFC 4180 quando contêm vírgulas, as
 
 ## Testes
 
+Execute toda a suíte com saída detalhada:
+
 ```bash
-go test ./...
-go test -race ./...
+go test -v ./...
 ```
+
+A suíte cobre diretamente as principais regras do enunciado:
+
+| Regra                         | Cobertura                                                                                                | Testes                                                                                            |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Filtro por campeonato**     | Apenas clubes da `SERIE A` e `SERIE B` são escritos nos CSVs.                                            | `TestProcessWritesPlayersOnlyForEligibleClubs`                                                    |
+| **Ligação clube → jogadores** | Mantém clubes sem jogadores, associa jogadores ao clube correto e ignora jogadores sem `club_id` válido. | `TestProcessClubsWithoutPlayersFixture`<br>`TestProcessSkipsPlayersWithoutClubID/club_ID_ausente` |
+| **Cores**                     | Concatena múltiplas cores com `\|` e mantém o campo vazio quando não informado.                          | `TestClubRow`<br>`TestProcessClubsWithoutPlayersFixture`                                          |
+| **Datas**                     | Preserva datas válidas e transforma datas inválidas ou ausentes em campo vazio.                          | `TestNormalizeDate/valida`<br>`TestNormalizeDate/dia_invalido`                                    |
+| **Campos ausentes**           | Campos nulos ou inexistentes são escritos como valores vazios no CSV.                                    | `TestProcessMalformedAndMissingFieldsFixture`                                                     |
+| **Formato CSV**               | Valida cabeçalhos, UTF-8 e escaping correto de vírgulas, aspas e quebras de linha.                       | `TestProcessWritesHeadersForEmptyInput`<br>`TestProcessCSVEscapingFixture`                        |
+| **JSON malformado**           | Linhas inválidas são ignoradas sem interromper o processamento das próximas.                             | `TestProcessMalformedAndMissingFieldsFixture`                                                     |
+| **Concorrência e ordem**      | A saída permanece determinística com um ou vários workers, inclusive entre diferentes batches.           | `TestProcessWithOneAndManyWorkersMatchAcrossBatches`                                              |
+
+Os testes usam conjuntos pequenos de **dados de teste** para validar o conteúdo final dos CSVs, enquanto os testes unitários cobrem as transformações isoladamente.
 
 ## Gerador de carga
 
