@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/prettyletto/bigdatacorp-batch-challenge/cmd/internal/batch"
+	"github.com/prettyletto/bigdatacorp-batch-challenge/internal/batch"
 )
 
 func main() {

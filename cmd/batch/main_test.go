@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/prettyletto/bigdatacorp-batch-challenge/cmd/internal/batch"
+	"github.com/prettyletto/bigdatacorp-batch-challenge/internal/batch"
 )
 
 func TestRunWithoutInput(t *testing.T) {

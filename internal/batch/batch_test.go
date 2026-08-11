@@ -74,7 +74,7 @@ func TestProcessWritesHeadersForEmptyInput(t *testing.T) {
 }
 
 func TestProcessReadsSampleFile(t *testing.T) {
-	file, err := os.Open(filepath.Join("..", "..", "..", "sample_clubes.jsonl"))
+	file, err := os.Open(filepath.Join("..", "..", "sample_clubes.jsonl"))
 	if err != nil {
 		t.Fatalf("opening sample file: %v", err)
 	}
