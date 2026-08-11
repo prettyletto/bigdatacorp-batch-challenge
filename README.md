@@ -15,28 +15,17 @@ São incluídos apenas clubes de `SERIE A` e `SERIE B`. Campos ausentes ou nulos
 go run ./cmd/batch sample_clubes.jsonl
 ```
 
-Para processar em paralelo, informe a quantidade de workers. O padrão é `1`. A opção `-maxsize` controla o tamanho máximo de cada batch em memória, em MiB; o padrão é `32`.
+| Opção | Descrição |
+| --- | --- |
+| `-workers N` | Quantidade de workers. Padrão: `1`. |
+| `-maxsize N` | Tamanho máximo do batch em MiB. Padrão: `32`. |
+| `-v` | Exibe progresso e métricas de processamento em `stderr`. |
 
 ```bash
 go run ./cmd/batch -workers 8 -maxsize 16 sample_clubes.jsonl
 ```
 
-Um registro individual maior que o limite continua sendo processado normalmente. O limite controla o acúmulo de registros por batch.
-
-Use `-v` para acompanhar o processamento em `stderr`. Em arquivos com 100 kB ou mais, o progresso é exibido a cada 100 mil registros. Em arquivos menores, ele é exibido a cada 10% dos bytes processados. Cada linha reúne o total processado, o total de JSONs malformados e o total de clubes ignorados. Para JSON malformado, o log informa o número do registro e o erro de parsing, sem imprimir o conteúdo da linha.
-
-```bash
-go run ./cmd/batch -v -workers 8 -maxsize 16 sample_clubes.jsonl 2> processamento.log
-```
-
 Os arquivos `clubs.csv` e `players.csv` são gravados no diretório atual. A escrita de cada CSV é atômica: em caso de erro durante o processamento, o arquivo final anterior é preservado.
-
-Exemplo com binário compilado:
-
-```bash
-go build -o batch ./cmd/batch
-./batch -workers 8 -maxsize 32 caminho/para/clubes.jsonl
-```
 
 ## Saída
 
@@ -75,7 +64,7 @@ A suíte cobre diretamente as principais regras do enunciado:
 
 Os testes usam conjuntos pequenos de **dados de teste** para validar o conteúdo final dos CSVs, enquanto os testes unitários cobrem as transformações isoladamente.
 
-## Gerador de carga
+## Gerador para Testes
 
 O utilitário abaixo cria uma entrada JSONL determinística para testes locais. Ele alterna entre `SERIE A`, `SERIE B` e `SERIE C`.
 
@@ -85,23 +74,32 @@ go run ./cmd/generate -records 1000000 -players 2 -output .local/1m.jsonl
 
 ## Benchmark
 
-O script `scripts/benchmark-workers.sh` compara o processamento sequencial com `8` workers para 100 mil, 1 milhão e 10 milhões de clubes. Ele interrompe a execução se os CSVs paralelo e sequencial forem diferentes.
+O script `scripts/benchmark-workers.sh` gera uma única entrada de 10 milhões de clubes, com 2 jogadores por clube, e executa o batch com `1`, `2`, `4`, `8` e `16` workers. Cada saída é comparada byte a byte com a execução de 1 worker.
 
 ```bash
 scripts/benchmark-workers.sh
 ```
 
-O benchmark requer o GNU `time` com suporte à opção `-v`; o executável `batch` não depende dessa ferramenta. O relatório gerado localmente fica em `.local/benchmark-workers/report.md`.
+O benchmark requer o GNU `time` com suporte à opção `-v`; o executável `batch` não depende dessa ferramenta. O relatório local é escrito em `.local/benchmark-workers/report.md` e contém apenas os dados relevantes:
 
-Resultados obtidos nesta máquina:
+| Coluna | Leitura |
+| --- | --- |
+| Workers | Quantidade de workers usada na execução. |
+| Tempo decorrido | Wall time medido pelo GNU `time`. |
+| Memória máxima (RSS) | Pico de memória residente da execução. |
+| Ganho em relação ao anterior | Redução real de tempo em comparação com a linha anterior; `sem ganho` indica o primeiro ponto em que aumentar workers não ajudou. |
 
-| Clubes | Wall sequencial | Wall com 8 workers | Redução de wall time | Speedup | RSS sequencial | RSS com 8 workers | CPU sequencial -> 8 workers |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 100k | 0:01.93 | 0:00.58 | 69.9% | 3.33x | 10.9 MiB | 22.9 MiB | 102% -> 453% |
-| 1M | 0:10.02 | 0:03.23 | 67.8% | 3.10x | 10.8 MiB | 21.7 MiB | 102% -> 493% |
-| 10M | 1:49.43 | 0:39.75 | 63.7% | 2.75x | 10.5 MiB | 21.1 MiB | 103% -> 443% |
+Os resultados abaixo foram gerados por `scripts/benchmark-workers.sh`, com 10 milhões de clubes e 2 jogadores por clube, em um AMD Ryzen 7 5825U with Radeon Graphics, com 8 núcleos e 16 threads:
 
-O [relatório completo](assets/benchmark-workers.md) preserva o contexto e indica como reproduzir a medição.
+| Workers | Tempo decorrido | Memória máxima (RSS) | Ganho em relação ao anterior |
+| ---: | ---: | ---: | ---: |
+| 1 | 2:15.33 | 9.5 MiB | base |
+| 2 | 1:21.74 | 10.1 MiB | 39.6% mais rápido |
+| 4 | 0:58.96 | 12.2 MiB | 27.9% mais rápido |
+| 8 | 0:53.08 | 19.9 MiB | 10.0% mais rápido |
+| 16 | 0:49.44 | 37.3 MiB | 6.9% mais rápido |
+
+Nesta execução, todos os aumentos de workers reduziram o tempo. Cada resultado foi validado byte a byte contra a saída com 1 worker.
 
 
 ## Uso de IA

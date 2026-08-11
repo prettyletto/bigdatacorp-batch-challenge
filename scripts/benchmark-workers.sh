@@ -5,11 +5,12 @@ root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work_dir="$root_dir/.local/benchmark-workers"
 batch_bin="$work_dir/batch"
 generate_bin="$work_dir/generate"
+input="$work_dir/10m-2-players.jsonl"
 report="$work_dir/report.md"
 summary_rows="$work_dir/summary-rows.md"
-details="$work_dir/details.md"
-workers=8
-record_counts=(100000 1000000 10000000)
+records=10000000
+players=2
+worker_counts=(1 2 4 8 16)
 
 info() {
   printf '%s\n' "$*"
@@ -71,16 +72,14 @@ format_mib() {
 }
 
 run_batch() {
-  local label="$1"
-  local worker_count="$2"
-  local input="$3"
-  local run_dir="$4"
+  local workers="$1"
+  local run_dir="$work_dir/workers-${workers}"
 
   mkdir -p "$run_dir"
 
   (
     cd "$run_dir"
-    "$time_bin" -v -o time.txt "$batch_bin" -workers "$worker_count" "$input" > stats.txt
+    "$time_bin" -v -o time.txt "$batch_bin" -workers "$workers" "$input" > stats.txt
   )
 }
 
@@ -90,66 +89,58 @@ go build -o "$batch_bin" "$root_dir/cmd/batch"
 go build -o "$generate_bin" "$root_dir/cmd/generate"
 info "Usando GNU time: $time_bin"
 
+info "Gerando uma entrada com $records clubes e $players jogadores por clube..."
+"$generate_bin" -records "$records" -players "$players" -output "$input" > /dev/null
+
 : > "$summary_rows"
-: > "$details"
+baseline_dir=""
+previous_seconds=""
+plateau_workers=""
 
-for index in "${!record_counts[@]}"; do
-  records="${record_counts[$index]}"
-  input="$work_dir/${records}.jsonl"
-  sequential_dir="$work_dir/${records}-sequential"
-  parallel_dir="$work_dir/${records}-workers-${workers}"
+for workers in "${worker_counts[@]}"; do
+  info "Processando com $workers worker(s)..."
+  run_batch "$workers"
 
-  info "[$((index + 1))/${#record_counts[@]}] Gerando entrada com $records clubes..."
-  "$generate_bin" -records "$records" -output "$input" > /dev/null
-
-  info "[$((index + 1))/${#record_counts[@]}] Processando sequencialmente ($records clubes)..."
-  run_batch sequential 1 "$input" "$sequential_dir"
-
-  info "[$((index + 1))/${#record_counts[@]}] Processando com $workers workers ($records clubes)..."
-  run_batch "workers-${workers}" "$workers" "$input" "$parallel_dir"
-
-  if ! cmp -s "$sequential_dir/clubs.csv" "$parallel_dir/clubs.csv" || ! cmp -s "$sequential_dir/players.csv" "$parallel_dir/players.csv"; then
-    printf 'erro: os CSVs sequencial e paralelo diferem para %s clubes.\n' "$records" >&2
+  run_dir="$work_dir/workers-${workers}"
+  if [[ -z "$baseline_dir" ]]; then
+    baseline_dir="$run_dir"
+  elif ! cmp -s "$baseline_dir/clubs.csv" "$run_dir/clubs.csv" || ! cmp -s "$baseline_dir/players.csv" "$run_dir/players.csv"; then
+    printf 'erro: os CSVs com %s workers diferem da execução com 1 worker.\n' "$workers" >&2
     exit 1
   fi
 
-  sequential_wall="$(time_value 'Elapsed (wall clock)' "$sequential_dir/time.txt")"
-  parallel_wall="$(time_value 'Elapsed (wall clock)' "$parallel_dir/time.txt")"
-  sequential_seconds="$(wall_seconds "$sequential_wall")"
-  parallel_seconds="$(wall_seconds "$parallel_wall")"
-  reduction="$(awk -v sequential="$sequential_seconds" -v parallel="$parallel_seconds" 'BEGIN { printf "%.1f%%", (1 - parallel / sequential) * 100 }')"
-  speedup="$(awk -v sequential="$sequential_seconds" -v parallel="$parallel_seconds" 'BEGIN { printf "%.2fx", sequential / parallel }')"
-  sequential_rss="$(format_mib "$(time_value 'Maximum resident set size' "$sequential_dir/time.txt")")"
-  parallel_rss="$(format_mib "$(time_value 'Maximum resident set size' "$parallel_dir/time.txt")")"
-  sequential_cpu="$(time_value 'Percent of CPU' "$sequential_dir/time.txt")"
-  parallel_cpu="$(time_value 'Percent of CPU' "$parallel_dir/time.txt")"
+  elapsed="$(time_value 'Elapsed (wall clock)' "$run_dir/time.txt")"
+  elapsed_seconds="$(wall_seconds "$elapsed")"
+  rss="$(format_mib "$(time_value 'Maximum resident set size' "$run_dir/time.txt")")"
 
-  printf '| %s | %s | %s | %s | %s | %s | %s | %s -> %s |\n' \
-    "$records" "$sequential_wall" "$parallel_wall" "$reduction" "$speedup" \
-    "$sequential_rss" "$parallel_rss" "$sequential_cpu" "$parallel_cpu" \
-    >> "$summary_rows"
+  if [[ -z "$previous_seconds" ]]; then
+    gain="base"
+  elif awk -v current="$elapsed_seconds" -v previous="$previous_seconds" 'BEGIN { exit !(current < previous) }'; then
+    gain="$(awk -v current="$elapsed_seconds" -v previous="$previous_seconds" 'BEGIN { printf "%.1f%% mais rápido", (1 - current / previous) * 100 }')"
+  else
+    gain="sem ganho"
+    if [[ -z "$plateau_workers" ]]; then
+      plateau_workers="$workers"
+    fi
+  fi
 
-  {
-    printf '## %s Clubes\n\n' "$records"
-    printf 'Os CSVs sequencial e paralelo foram identicos byte a byte.\n\n'
-    printf '### Sequencial (`-workers 1`)\n\n```text\n'
-    awk '1' "$sequential_dir/time.txt"
-    printf '```\n\n### Paralelo (`-workers %d`)\n\n```text\n' "$workers"
-    awk '1' "$parallel_dir/time.txt"
-    printf '```\n\n'
-  } >> "$details"
+  printf '| %s | %s | %s | %s |\n' "$workers" "$elapsed" "$rss" "$gain" >> "$summary_rows"
+  previous_seconds="$elapsed_seconds"
 done
 
 {
-  printf '# Benchmark de Workers do Batch\n\n'
-  printf 'Compara o processamento sequencial com `%d` workers usando a mesma entrada gerada.\n\n' "$workers"
-  printf 'O script interrompe a execucao se qualquer CSV paralelo diferir do sequencial. '
-  printf 'O GNU time e necessario apenas para este benchmark; o executavel batch nao depende dele.\n\n'
-  printf '| Clubes | Wall sequencial | Wall com %d workers | Reducao de wall time | Speedup | RSS sequencial | RSS com %d workers | CPU sequencial -> %d workers |\n' "$workers" "$workers" "$workers"
-  printf '| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n'
+  printf '# Benchmark de Workers\n\n'
+  printf 'Gerado por `scripts/benchmark-workers.sh` com uma única entrada de %s clubes e %s jogadores por clube.\n\n' "$records" "$players"
+  printf 'Cada execução é comparada byte a byte com a saída de 1 worker. O GNU `time -v` é necessário apenas para o benchmark; o executável `batch` não depende dele.\n\n'
+  printf '| Workers | Tempo decorrido | Memória máxima (RSS) | Ganho em relação ao anterior |\n'
+  printf '| ---: | ---: | ---: | ---: |\n'
   awk '1' "$summary_rows"
   printf '\n'
-  awk '1' "$details"
+  if [[ -n "$plateau_workers" ]]; then
+    printf 'O primeiro aumento sem benefício de tempo foi em `%s` workers.\n' "$plateau_workers"
+  else
+    printf 'Todos os aumentos de workers reduziram o tempo nesta execução.\n'
+  fi
 } > "$report"
 
-info "Benchmark concluido. Relatorio: $report"
+info "Benchmark concluído. Relatório: $report"
