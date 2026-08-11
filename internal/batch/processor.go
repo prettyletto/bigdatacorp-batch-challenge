@@ -9,6 +9,14 @@ import (
 type Options struct {
 	Workers       int
 	MaxBatchBytes int
+	OnProgress    func(Progress)
+}
+
+type Progress struct {
+	RecordsRead      int64
+	BytesRead        int64
+	MalformedRecords int64
+	SkippedClubs     int64
 }
 
 func Process(r io.Reader, clubsOutput, playersOutput io.Writer) (Stats, error) {
@@ -50,9 +58,9 @@ func ProcessWithOptions(r io.Reader, clubsOutput, playersOutput io.Writer, optio
 	)
 
 	if workers == 1 {
-		stats, err = processSequential(r, clubsWriter, playersWriter)
+		stats, err = processSequential(r, clubsWriter, playersWriter, options.OnProgress)
 	} else {
-		stats, err = processParallel(r, clubsWriter, playersWriter, workers, maxBatchBytes)
+		stats, err = processParallel(r, clubsWriter, playersWriter, workers, maxBatchBytes, options.OnProgress)
 	}
 
 	if err != nil {
@@ -70,6 +78,19 @@ func ProcessWithOptions(r io.Reader, clubsOutput, playersOutput io.Writer, optio
 	}
 
 	return stats, nil
+}
+
+func reportProgress(onProgress func(Progress), stats Stats, bytesRead int64) {
+	if onProgress == nil {
+		return
+	}
+
+	onProgress(Progress{
+		RecordsRead:      stats.RecordsRead,
+		BytesRead:        bytesRead,
+		MalformedRecords: stats.MalformedRecords,
+		SkippedClubs:     stats.FilteredChampionship,
+	})
 }
 
 func writeResult(

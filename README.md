@@ -23,6 +23,12 @@ go run ./cmd/batch -workers 8 -maxsize 16 sample_clubes.jsonl
 
 Um registro individual maior que o limite continua sendo processado normalmente. O limite controla o acúmulo de registros por batch.
 
+Use `-v` para acompanhar o processamento em `stderr`. Em arquivos com 100 kB ou mais, o progresso é exibido a cada 100 mil registros. Em arquivos menores, ele é exibido a cada 10% dos bytes processados. Cada linha reúne o total processado, o total de JSONs malformados e o total de clubes ignorados.
+
+```bash
+go run ./cmd/batch -v -workers 8 -maxsize 16 sample_clubes.jsonl 2> processamento.log
+```
+
 Os arquivos `clubs.csv` e `players.csv` são gravados no diretório atual. A escrita de cada CSV é atômica: em caso de erro durante o processamento, o arquivo final anterior é preservado.
 
 Exemplo com binário compilado:

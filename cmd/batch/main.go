@@ -32,6 +32,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	var (
 		workers int
 		maxSize int
+		verbose bool
 	)
 
 	flags.IntVar(
@@ -46,9 +47,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 		32,
 		"tamanho máximo do batch em MiB",
 	)
+	flags.BoolVar(
+		&verbose,
+		"v",
+		false,
+		"exibe logs de processamento em stderr",
+	)
 
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "uso: batch [-workers N] [-maxsize MiB] <input.jsonl>")
+		fmt.Fprintln(stderr, "uso: batch [-v] [-workers N] [-maxsize MiB] <input.jsonl>")
 	}
 
 	if err := flags.Parse(args); err != nil {
@@ -97,9 +104,20 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	defer playersOutput.Discard()
 
+	var onProgress func(batch.Progress)
+	if verbose {
+		inputInfo, err := inputFile.Stat()
+		if err != nil {
+			fmt.Fprintf(stderr, "erro ao obter tamanho do arquivo de entrada: %v\n", err)
+			return 1
+		}
+		onProgress = newProgressLogger(stderr, inputInfo.Size())
+	}
+
 	stats, err := batch.ProcessWithOptions(inputFile, clubsOutput.file, playersOutput.file, batch.Options{
 		Workers:       workers,
 		MaxBatchBytes: maxSize << 20,
+		OnProgress:    onProgress,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao processar arquivo: %v\n", err)
@@ -142,6 +160,37 @@ func (output *atomicOutput) Commit() error {
 func (output *atomicOutput) Discard() {
 	_ = output.file.Close()
 	_ = os.Remove(output.file.Name())
+}
+
+func newProgressLogger(stderr io.Writer, inputSize int64) func(batch.Progress) {
+	w := tabwriter.NewWriter(stderr, 0, 0, 2, ' ', 0)
+	var nextRecord int64 = 100_000
+	var nextPercent int64 = 10
+
+	return func(progress batch.Progress) {
+		if inputSize > 0 && inputSize < 100_000 {
+			percent := progress.BytesRead * 100 / inputSize
+			if percent >= nextPercent {
+				writeProgress(w, progress, fmt.Sprintf("%d registros", progress.RecordsRead))
+				nextPercent = (percent/10 + 1) * 10
+			}
+		} else if progress.RecordsRead >= nextRecord {
+			writeProgress(w, progress, fmt.Sprintf("%d registros", progress.RecordsRead))
+			nextRecord += 100_000
+		}
+
+		_ = w.Flush()
+	}
+}
+
+func writeProgress(w *tabwriter.Writer, progress batch.Progress, processed string) {
+	fmt.Fprintf(
+		w,
+		"Processamento\t%s\t|\tMalformados\t%d\t|\tIgnorados\t%d\n",
+		processed,
+		progress.MalformedRecords,
+		progress.SkippedClubs,
+	)
 }
 
 func isJSONL(path string) bool {

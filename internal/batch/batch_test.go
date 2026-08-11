@@ -187,6 +187,52 @@ func TestProcessWithOptionsHandlesWorkerCounts(t *testing.T) {
 	}
 }
 
+func TestProcessWithOptionsReportsOrderedProgress(t *testing.T) {
+	input := strings.NewReader(strings.Join([]string{
+		`{"club_id":"SCCP","championship":"SERIE A"}`,
+		`json inválido`,
+		`{"club_id":"NAC","championship":"SERIE C"}`,
+	}, "\n"))
+	var progress []Progress
+
+	_, err := ProcessWithOptions(
+		input,
+		&bytes.Buffer{},
+		&bytes.Buffer{},
+		Options{
+			Workers:       2,
+			MaxBatchBytes: 1,
+			OnProgress: func(event Progress) {
+				progress = append(progress, event)
+			},
+		},
+	)
+
+	if err != nil {
+		t.Fatalf("ProcessWithOptions returned error: %v", err)
+	}
+	if len(progress) != 3 {
+		t.Fatalf("progress events = %d, want 3", len(progress))
+	}
+	for index, event := range progress {
+		if event.RecordsRead != int64(index+1) {
+			t.Fatalf("event %d records read = %d, want %d", index, event.RecordsRead, index+1)
+		}
+		if event.BytesRead <= 0 || (index > 0 && event.BytesRead <= progress[index-1].BytesRead) {
+			t.Fatalf("event %d bytes read = %d, want monotonically increasing value", index, event.BytesRead)
+		}
+	}
+	if progress[0].MalformedRecords != 0 || progress[0].SkippedClubs != 0 {
+		t.Fatalf("first event = %+v, want no malformed or skipped records", progress[0])
+	}
+	if progress[1].MalformedRecords != 1 || progress[1].SkippedClubs != 0 {
+		t.Fatalf("second event = %+v, want one malformed record", progress[1])
+	}
+	if progress[2].MalformedRecords != 1 || progress[2].SkippedClubs != 1 {
+		t.Fatalf("third event = %+v, want one malformed and one skipped record", progress[2])
+	}
+}
+
 func TestProcessMalformedAndMissingFieldsFixture(t *testing.T) {
 	stats, clubsRows, playersRows := processFixture(t, "malformed_and_missing_fields.jsonl")
 

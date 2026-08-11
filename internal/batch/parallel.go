@@ -19,10 +19,12 @@ func processParallel(
 	playersWriter *csv.Writer,
 	workers int,
 	maxBatchBytes int,
+	onProgress func(Progress),
 ) (Stats, error) {
 	reader := bufio.NewReader(r)
 
 	var stats Stats
+	var bytesRead int64
 
 	batchSize := workers * recordsPerWorkerBatch
 
@@ -35,10 +37,13 @@ func processParallel(
 		if len(lines) > 0 {
 			records := processBatch(lines, workers)
 
-			for _, record := range records {
+			for index, record := range records {
 				if err := writeResult(record, clubsWriter, playersWriter, &stats); err != nil {
 					return stats, err
 				}
+
+				bytesRead += int64(len(lines[index]))
+				reportProgress(onProgress, stats, bytesRead)
 			}
 		}
 		if eof {

@@ -103,6 +103,47 @@ func TestRunRejectsInvalidMaxSize(t *testing.T) {
 	}
 }
 
+func TestRunVerboseLogsProgressAndInvalidRecords(t *testing.T) {
+	inputPath := filepath.Join(t.TempDir(), "clubes.jsonl")
+	malformedPayload := strings.Repeat("json-malformado-", 1_000)
+	input := strings.Join([]string{
+		`{"club_id":"SCCP","championship":"SERIE A"}`,
+		malformedPayload,
+		`{"club_id":"NAC","championship":"SERIE C"}`,
+	}, "\n")
+	if err := os.WriteFile(inputPath, []byte(input), 0o600); err != nil {
+		t.Fatalf("creating input file: %v", err)
+	}
+
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting working directory: %v", err)
+	}
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatalf("changing working directory: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(workingDirectory) })
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"-v", "-workers", "2", inputPath}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr = %q", code, stderr.String())
+	}
+	for _, message := range []string{"Processamento", "Malformados", "Ignorados"} {
+		if !strings.Contains(stderr.String(), message) {
+			t.Fatalf("expected %q in verbose stderr, got %q", message, stderr.String())
+		}
+	}
+	if strings.Contains(stderr.String(), "Linha malformada") || strings.Contains(stderr.String(), "Clube ignorado") {
+		t.Fatalf("verbose stderr should contain aggregate logs only, got %q", stderr.String())
+	}
+	if strings.Contains(stderr.String(), malformedPayload) {
+		t.Fatal("verbose stderr should not include malformed JSON content")
+	}
+}
+
 func TestAtomicOutputCommitReplacesDestination(t *testing.T) {
 	destination := filepath.Join(t.TempDir(), "clubs.csv")
 	if err := os.WriteFile(destination, []byte("previous"), 0o600); err != nil {
