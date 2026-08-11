@@ -75,7 +75,9 @@ go run ./cmd/generate -records 1000000 -players 2 -output .local/1m.jsonl
 
 ## Onde o paralelismo ajuda
 
-Para identificar onde o paralelismo realmente reduz o tempo de execução, foram medidos separadamente leitura, processamento e escrita usando 1 milhão de clubes com 26 jogadores por clube.
+Os workers são aplicados **somente ao processamento**. A leitura do JSONL e a escrita dos CSVs continuam sequenciais.
+
+Para verificar se essa escolha fazia sentido, as três etapas foram medidas separadamente com 1 milhão de clubes e 26 jogadores por clube.
 
 | Workers | Leitura | Processamento | Escrita | Tempo total |
 | ------: | ------: | ------------: | ------: | ----------: |
@@ -85,12 +87,11 @@ Para identificar onde o paralelismo realmente reduz o tempo de execução, foram
 |       8 |     10s |           18s |      6s |         34s |
 |      16 |      8s |           17s |      7s |         32s |
 
-O tempo reduzível está principalmente no **processamento**: de `1m25s` com 1 worker para `18s` com 8. Já leitura e escrita permanecem próximas de `10s` e `6s`, respectivamente, independentemente da quantidade de workers.
+A maior parte do tempo está no processamento, que cai de `1m25s` com 1 worker para `18s` com 8. Leitura e escrita permanecem próximas de `10s` e `6s`, pois não são paralelizadas.
 
-Por isso, aumentar os workers melhora principalmente o processamento. A partir de 8 workers, o ganho diminui bastante, pois leitura e escrita continuam essencialmente sequenciais e o próprio processamento já apresenta pouco ganho adicional.
+A diferença entre 8 e 16 workers já é pequena. Nesta máquina, com 8 núcleos físicos e 16 threads, aumentar o número de workers além desse ponto não apresenta um ganho relevante de processamento.
 
 ## Benchmark
-
 
 O script `scripts/benchmark-workers.sh` gera uma única entrada de 1 milhão de clubes, com 26 jogadores por clube, e executa o batch com `1`, `2`, `4`, `8` e `16` workers nessa ordem. A compilação, a geração, o aquecimento do cache da entrada e a comparação byte a byte ficam fora da medição.
 
@@ -119,8 +120,13 @@ Resultados obtidos nesta máquina com 1 milhão de clubes e 26 jogadores por clu
 | 8 | 29s | 83.7 MiB | 16.7% mais rápido |
 | 16 | 27s | 132.8 MiB | 6.9% mais rápido |
 
-Nesta execução, todos os aumentos de workers reduziram o tempo. O relatório local em `.local/benchmark-workers/report.md` preserva a mesma tabela.
+Os maiores ganhos aparecem até 8 workers. A diferença entre 8 e 16 workers é pequena o suficiente para variar entre execuções e não deve ser interpretada isoladamente como ganho de desempenho. Ao mesmo tempo, o aumento de workers continua elevando o consumo de memória.
 
+O relatório local em `.local/benchmark-workers/report.md` preserva a mesma tabela.
+
+## Próximos passos
+
+* Avaliar um pipeline de streaming com channels e worker pool, no qual a leitura alimenta continuamente os workers e os resultados são consumidos pela escrita. Isso permitiria sobrepor leitura, processamento e escrita, em vez de executar essas etapas separadamente por batch.
 
 ## Uso de IA
 
