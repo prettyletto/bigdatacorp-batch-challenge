@@ -2,23 +2,13 @@ package main
 
 import (
 	"bytes"
-	"encoding/csv"
-	"errors"
-	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
+
+	"github.com/prettyletto/bigdatacorp-batch-challenge/cmd/internal/batch"
 )
-
-var errOutputUnavailable = errors.New("output unavailable")
-
-type errorWriter struct{}
-
-func (errorWriter) Write([]byte) (int, error) {
-	return 0, errOutputUnavailable
-}
 
 func TestRunWithoutInput(t *testing.T) {
 	var stdout bytes.Buffer
@@ -27,450 +17,90 @@ func TestRunWithoutInput(t *testing.T) {
 	code := run(nil, &stdout, &stderr)
 
 	if code == 0 {
-		t.Fatal("esperava código de saída diferente de zero.")
+		t.Fatal("expected a non-zero exit code")
 	}
-
 	if stdout.Len() != 0 {
-		t.Fatalf("stdout deveria estar vazio, recebeu %q", stdout.String())
+		t.Fatalf("stdout should be empty, got %q", stdout.String())
 	}
-
 	if !strings.Contains(stderr.String(), "uso:") {
-		t.Fatalf(
-			"esperava mensagem de uso em stderr, recebeu %q",
-			stderr.String(),
-		)
+		t.Fatalf("expected usage message in stderr, got %q", stderr.String())
 	}
 }
 
-func TestRunRejectNonJSONLInput(t *testing.T) {
+func TestRunRejectsNonJSONLInput(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := run(
-		[]string{"clubes.json"},
-		&stdout,
-		&stderr,
-	)
+	code := run([]string{"clubes.json"}, &stdout, &stderr)
 
 	if code == 0 {
-		t.Fatal("esperava código de saída diferente de zero.")
+		t.Fatal("expected a non-zero exit code")
 	}
-
 	if !strings.Contains(stderr.String(), ".jsonl") {
-		t.Fatalf(
-			"esperava erro sobre extensão .jsonl, recebeu %q",
-			stderr.String(),
-		)
+		t.Fatalf("expected JSONL extension error, got %q", stderr.String())
 	}
 }
 
-func TestRunWithMissingFile(t *testing.T) {
+func TestRunRejectsMissingFile(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	missingPath := filepath.Join(t.TempDir(), "arquivo-que-nao-existe.jsonl")
 
-	code := run(
-		[]string{missingPath},
-		&stdout,
-		&stderr,
-	)
+	code := run([]string{filepath.Join(t.TempDir(), "missing.jsonl")}, &stdout, &stderr)
 
 	if code == 0 {
-		t.Fatal("esperava código de saída diferente de zero.")
+		t.Fatal("expected a non-zero exit code")
 	}
-
 	if !strings.Contains(stderr.String(), "erro ao abrir") {
-		t.Fatalf(
-			"esperava erro ao abrir arquivo, recebeu %q",
-			stderr.String(),
-		)
+		t.Fatalf("expected input opening error, got %q", stderr.String())
 	}
 }
 
-func TestRunProcessesValidJSONLFile(t *testing.T) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
+func TestRunGeneratesCSVFilesFromSample(t *testing.T) {
 	inputPath, err := filepath.Abs(filepath.Join("..", "..", "sample_clubes.jsonl"))
 	if err != nil {
-		t.Fatalf("resolvendo caminho da amostra: %v", err)
+		t.Fatalf("resolving sample path: %v", err)
 	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {
-		t.Fatalf("obtendo diretorio de trabalho: %v", err)
+		t.Fatalf("getting working directory: %v", err)
 	}
 	if err := os.Chdir(t.TempDir()); err != nil {
-		t.Fatalf("mudando diretorio de trabalho: %v", err)
+		t.Fatalf("changing working directory: %v", err)
 	}
 	t.Cleanup(func() { _ = os.Chdir(workingDirectory) })
 
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	code := run([]string{inputPath}, &stdout, &stderr)
 
 	if code != 0 {
-		t.Fatalf("codigo de saida = %d, queria 0; stderr = %q", code, stderr.String())
+		t.Fatalf("exit code = %d, stderr = %q", code, stderr.String())
 	}
 	if stderr.Len() != 0 {
-		t.Fatalf("stderr deveria estar vazio, recebeu %q", stderr.String())
+		t.Fatalf("stderr should be empty, got %q", stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Registros lidos                   6") {
-		t.Fatalf("esperava contagem da amostra em stdout, recebeu %q", stdout.String())
+	for _, filename := range []string{"clubs.csv", "players.csv"} {
+		if _, err := os.Stat(filename); err != nil {
+			t.Fatalf("expected %s to be generated: %v", filename, err)
+		}
 	}
-	file, err := os.Open("clubs.csv")
-	if err != nil {
-		t.Fatalf("abrindo clubs.csv gerado: %v", err)
-	}
-	defer file.Close()
-	rows, err := csv.NewReader(file).ReadAll()
-	if err != nil {
-		t.Fatalf("lendo clubs.csv gerado: %v", err)
-	}
-	if len(rows) != 6 {
-		t.Fatalf("linhas em clubs.csv = %d, queria 6", len(rows))
-	}
-	playersFile, err := os.Open("players.csv")
-	if err != nil {
-		t.Fatalf("abrindo players.csv gerado: %v", err)
-	}
-	defer playersFile.Close()
-	playersRows, err := csv.NewReader(playersFile).ReadAll()
-	if err != nil {
-		t.Fatalf("lendo players.csv gerado: %v", err)
-	}
-	if len(playersRows) != 9 {
-		t.Fatalf("linhas em players.csv = %d, queria 9", len(playersRows))
+	if !strings.Contains(stdout.String(), "Registros lidos") {
+		t.Fatalf("expected statistics in stdout, got %q", stdout.String())
 	}
 }
 
 func TestIsJSONL(t *testing.T) {
-	tests := []struct {
-		name string
+	for _, tt := range []struct {
 		path string
 		want bool
 	}{
-		{name: "extensao minuscula", path: "clubes.jsonl", want: true},
-		{name: "extensao maiuscula", path: "CLUBES.JSONL", want: true},
-		{name: "sem extensao", path: "clubes", want: false},
-		{name: "extensao diferente", path: "clubes.json", want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isJSONL(tt.path); got != tt.want {
-				t.Fatalf("isJSONL(%q) = %t, queria %t", tt.path, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFilterChampionship(t *testing.T) {
-	tests := []struct {
-		name  string
-		value string
-		want  string
-		ok    bool
-	}{
-		{name: "serie A", value: "SERIE A", want: "SERIE A", ok: true},
-		{name: "serie B", value: "SERIE B", want: "SERIE B", ok: true},
-		{name: "espacos ao redor", value: "  SERIE A  ", want: "SERIE A", ok: true},
-		{name: "campeonato nao elegivel", value: "SERIE C", want: "", ok: false},
-		{name: "campeonato ausente", value: "", want: "", ok: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, ok := filterChampionship(tt.value)
-			if got != tt.want || ok != tt.ok {
-				t.Fatalf("filterChampionship(%q) = (%q, %t), queria (%q, %t)", tt.value, got, ok, tt.want, tt.ok)
-			}
-		})
-	}
-}
-
-func TestProcessCountsAllRecordsAndSkipsMalformedOnes(t *testing.T) {
-	input := strings.NewReader("{\"club_id\":\"SCCP\",\"championship\":\"SERIE A\"}\njson invalido\n{\"club_id\":\"SEP\",\"championship\":\"SERIE B\"}")
-
-	stats, err := process(input, &bytes.Buffer{}, &bytes.Buffer{})
-
-	if err != nil {
-		t.Fatalf("process retornou erro: %v", err)
-	}
-	if stats.RecordsRead != 3 {
-		t.Fatalf("Registros lidos = %d, queria 3", stats.RecordsRead)
-	}
-	if stats.MalformedRecords != 1 {
-		t.Fatalf("Registros malformados = %d, queria 1", stats.MalformedRecords)
-	}
-	if stats.SerieAClubs != 1 || stats.SerieBClubs != 1 || stats.FilteredChampionship != 0 {
-		t.Fatalf("metricas de campeonato = %+v, queria 1 clube em cada serie e nenhum filtrado", stats)
-	}
-}
-
-func TestProcessHandlesEmptyInput(t *testing.T) {
-	var clubsOutput bytes.Buffer
-	var playersOutput bytes.Buffer
-	stats, err := process(strings.NewReader(""), &clubsOutput, &playersOutput)
-
-	if err != nil {
-		t.Fatalf("process retornou erro: %v", err)
-	}
-	if stats != (Stats{}) {
-		t.Fatalf("estatisticas = %+v, queria estatisticas vazias", stats)
-	}
-	if clubsOutput.String() != "Id do Clube,Nome,Campeonato,Data de Fundação,Cidade,Estado,País,Estádio,Presidente,Apelido,Cores\n" {
-		t.Fatalf("clubs.csv = %q, queria apenas o cabecalho", clubsOutput.String())
-	}
-	if playersOutput.String() != "Id do Clube,Id do Jogador,Nome,Idade,Gols,Data de Estreia,Posição,Número da Camisa\n" {
-		t.Fatalf("players.csv = %q, queria apenas o cabecalho", playersOutput.String())
-	}
-}
-
-func TestProcessReadsSampleFile(t *testing.T) {
-	file, err := os.Open(filepath.Join("..", "..", "sample_clubes.jsonl"))
-	if err != nil {
-		t.Fatalf("abrindo arquivo de amostra: %v", err)
-	}
-	defer file.Close()
-
-	var clubsOutput bytes.Buffer
-	var playersOutput bytes.Buffer
-	stats, err := process(file, &clubsOutput, &playersOutput)
-
-	if err != nil {
-		t.Fatalf("process retornou erro: %v", err)
-	}
-	if stats.RecordsRead != 6 {
-		t.Fatalf("Registros lidos = %d, queria 6", stats.RecordsRead)
-	}
-	if stats.MalformedRecords != 0 {
-		t.Fatalf("Registros malformados = %d, queria 0", stats.MalformedRecords)
-	}
-	if stats.SerieAClubs != 3 {
-		t.Fatalf("Registros SERIE A = %d, queria 3", stats.SerieAClubs)
-	}
-	if stats.SerieBClubs != 2 {
-		t.Fatalf("Registros SERIE B = %d, queria 2", stats.SerieBClubs)
-	}
-	if stats.FilteredChampionship != 1 {
-		t.Fatalf("Registros filtrados = %d, queria 1", stats.FilteredChampionship)
-	}
-	if stats.ClubRowsWritten != 5 {
-		t.Fatalf("Linhas de clubes geradas = %d, queria 5", stats.ClubRowsWritten)
-	}
-	if stats.PlayerRowsWritten != 8 {
-		t.Fatalf("Linhas de jogadores geradas = %d, queria 8", stats.PlayerRowsWritten)
-	}
-	rows, err := csv.NewReader(strings.NewReader(clubsOutput.String())).ReadAll()
-	if err != nil {
-		t.Fatalf("lendo CSV gerado: %v", err)
-	}
-	if len(rows) != 6 {
-		t.Fatalf("linhas no CSV = %d, queria 6", len(rows))
-	}
-	playerRows, err := csv.NewReader(strings.NewReader(playersOutput.String())).ReadAll()
-	if err != nil {
-		t.Fatalf("lendo players.csv gerado: %v", err)
-	}
-	if len(playerRows) != 9 {
-		t.Fatalf("linhas em players.csv = %d, queria 9", len(playerRows))
-	}
-}
-
-func TestProcessEscapesCSVFields(t *testing.T) {
-	input := strings.NewReader("{\"club_id\":\"SCCP\",\"name\":\"Clube, do \\\"Povo\\\"\",\"championship\":\"SERIE A\",\"president\":\"Ana\\nSilva\"}")
-	var clubsOutput bytes.Buffer
-	var playersOutput bytes.Buffer
-
-	_, err := process(input, &clubsOutput, &playersOutput)
-
-	if err != nil {
-		t.Fatalf("process retornou erro: %v", err)
-	}
-	rows, err := csv.NewReader(strings.NewReader(clubsOutput.String())).ReadAll()
-	if err != nil {
-		t.Fatalf("lendo CSV gerado: %v", err)
-	}
-	if len(rows) != 2 {
-		t.Fatalf("linhas no CSV = %d, queria 2", len(rows))
-	}
-	if rows[1][1] != "Clube, do \"Povo\"" {
-		t.Fatalf("nome = %q, queria campo com virgula e aspas preservadas", rows[1][1])
-	}
-	if rows[1][8] != "Ana\nSilva" {
-		t.Fatalf("presidente = %q, queria campo com quebra de linha preservada", rows[1][8])
-	}
-}
-
-func TestProcessWritesPlayersForEligibleClubs(t *testing.T) {
-	input := strings.NewReader(strings.Join([]string{
-		`{"club_id":"SCCP","championship":"SERIE A","players":[{"player_id":"SCCP-10","name":"Rodrigo Garro","age":26,"goals":8,"debut_date":"2024-01-18","position":"Meia","shirt_number":10}]}`,
-		`{"club_id":"AVA","championship":"SERIE B","players":[]}`,
-		`{"club_id":"NAC","championship":"SEM CAMPEONATO","players":[{"player_id":"NAC-1"}]}`,
-	}, "\n"))
-	var clubsOutput bytes.Buffer
-	var playersOutput bytes.Buffer
-
-	stats, err := process(input, &clubsOutput, &playersOutput)
-
-	if err != nil {
-		t.Fatalf("process retornou erro: %v", err)
-	}
-	if stats != (Stats{RecordsRead: 3, FilteredChampionship: 1, SerieAClubs: 1, SerieBClubs: 1, ClubRowsWritten: 2, PlayerRowsWritten: 1}) {
-		t.Fatalf("estatisticas = %+v, queria duas linhas de clubes e uma de jogador", stats)
-	}
-	rows, err := csv.NewReader(strings.NewReader(playersOutput.String())).ReadAll()
-	if err != nil {
-		t.Fatalf("lendo players.csv gerado: %v", err)
-	}
-	want := [][]string{
-		{"Id do Clube", "Id do Jogador", "Nome", "Idade", "Gols", "Data de Estreia", "Posição", "Número da Camisa"},
-		{"SCCP", "SCCP-10", "Rodrigo Garro", "26", "8", "2024-01-18", "Meia", "10"},
-	}
-	if !slices.EqualFunc(rows, want, func(a, b []string) bool { return slices.Equal(a, b) }) {
-		t.Fatalf("linhas em players.csv = %#v, queria %#v", rows, want)
-	}
-}
-
-func TestProcessReturnsOutputErrors(t *testing.T) {
-	for _, tt := range []struct {
-		name          string
-		clubsOutput   io.Writer
-		playersOutput io.Writer
-	}{
-		{name: "clubs.csv", clubsOutput: errorWriter{}, playersOutput: &bytes.Buffer{}},
-		{name: "players.csv", clubsOutput: &bytes.Buffer{}, playersOutput: errorWriter{}},
+		{path: "clubes.jsonl", want: true},
+		{path: "CLUBES.JSONL", want: true},
+		{path: "clubes", want: false},
+		{path: "clubes.json", want: false},
 	} {
-		t.Run(tt.name, func(t *testing.T) {
-			stats, err := process(strings.NewReader(""), tt.clubsOutput, tt.playersOutput)
-			if !errors.Is(err, errOutputUnavailable) {
-				t.Fatalf("erro = %v, queria erro do escritor", err)
-			}
-			if stats != (Stats{}) {
-				t.Fatalf("estatisticas = %+v, queria estatisticas vazias", stats)
-			}
-		})
-	}
-}
-
-func TestPlayerRow(t *testing.T) {
-	zero := 0
-	tests := []struct {
-		name   string
-		clubID string
-		player Player
-		want   []string
-	}{
-		{
-			name:   "campos transformados",
-			clubID: "SCCP",
-			player: Player{
-				PlayerID:    "SCCP-10",
-				Name:        "Rodrigo Garro",
-				Age:         intPointer(26),
-				Goals:       intPointer(8),
-				DebutDate:   "2024-01-18",
-				Position:    "Meia",
-				ShirtNumber: intPointer(10),
-			},
-			want: []string{"SCCP", "SCCP-10", "Rodrigo Garro", "26", "8", "2024-01-18", "Meia", "10"},
-		},
-		{
-			name: "campos opcionais e data invalida",
-			player: Player{
-				Age:         &zero,
-				Goals:       &zero,
-				DebutDate:   "2024-02-30",
-				ShirtNumber: &zero,
-			},
-			want: []string{"", "", "", "0", "0", "", "", "0"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := playerRow(tt.clubID, tt.player); !slices.Equal(got, tt.want) {
-				t.Fatalf("playerRow() = %#v, queria %#v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestIntValue(t *testing.T) {
-	zero := 0
-	for _, tt := range []struct {
-		value *int
-		want  string
-	}{
-		{value: nil, want: ""},
-		{value: &zero, want: "0"},
-		{value: intPointer(42), want: "42"},
-	} {
-		if got := intValue(tt.value); got != tt.want {
-			t.Fatalf("intValue(%v) = %q, queria %q", tt.value, got, tt.want)
-		}
-	}
-}
-
-func intPointer(value int) *int {
-	return &value
-}
-
-func TestClubRow(t *testing.T) {
-	nickname := "Timão"
-	tests := []struct {
-		name string
-		club Club
-		want []string
-	}{
-		{
-			name: "campos transformados",
-			club: Club{
-				ClubID:       "SCCP",
-				Name:         "Sport Club Corinthians Paulista",
-				Championship: "SERIE A",
-				FoundingDate: "1910-09-01",
-				City:         "São Paulo",
-				State:        "SP",
-				Country:      "Brasil",
-				Stadium:      "Neo Química Arena",
-				President:    "Augusto Melo",
-				Nickname:     &nickname,
-				Colors:       []string{"preto", "branco"},
-			},
-			want: []string{"SCCP", "Sport Club Corinthians Paulista", "SERIE A", "1910-09-01", "São Paulo", "SP", "Brasil", "Neo Química Arena", "Augusto Melo", "Timão", "preto|branco"},
-		},
-		{
-			name: "campos opcionais e data invalida",
-			club: Club{
-				FoundingDate: "2024-02-30",
-			},
-			want: []string{"", "", "", "", "", "", "", "", "", "", ""},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := clubRow(tt.club)
-			if !slices.Equal(got, tt.want) {
-				t.Fatalf("clubRow() = %#v, queria %#v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestNormalizeDate(t *testing.T) {
-	tests := []struct {
-		value string
-		want  string
-	}{
-		{value: "1910-09-01", want: "1910-09-01"},
-		{value: " 1910-09-01 ", want: "1910-09-01"},
-		{value: "1910-09-31", want: ""},
-		{value: "01/09/1910", want: ""},
-		{value: "", want: ""},
-	}
-
-	for _, tt := range tests {
-		if got := normalizeDate(tt.value); got != tt.want {
-			t.Fatalf("normalizeDate(%q) = %q, queria %q", tt.value, got, tt.want)
+		if got := isJSONL(tt.path); got != tt.want {
+			t.Fatalf("isJSONL(%q) = %t, want %t", tt.path, got, tt.want)
 		}
 	}
 }
@@ -478,10 +108,10 @@ func TestNormalizeDate(t *testing.T) {
 func TestPrintStats(t *testing.T) {
 	var output bytes.Buffer
 
-	printStats(&output, Stats{RecordsRead: 12, MalformedRecords: 3})
+	printStats(&output, batch.Stats{RecordsRead: 12, MalformedRecords: 3})
 
-	want := "Resultados do Batch\n\nMétrica                           Total\nRegistros lidos                   12\nRegistros Malformados             3\nClubes Filtrados(SEM CAMPEONATO)  0\nClubes Série A                    0\nClubes Série B                    0\nLinhas de Clubes Geradas          0\nLinhas de Jogadores Geradas       0\n"
+	want := "Resultados do Batch\n\nMétrica                          Total\nRegistros lidos                  12\nRegistros Malformados            3\nClubes ignorados por campeonato  0\nClubes Série A                   0\nClubes Série B                   0\nLinhas de Clubes Geradas         0\nLinhas de Jogadores Geradas      0\n"
 	if output.String() != want {
-		t.Fatalf("saida = %q, queria %q", output.String(), want)
+		t.Fatalf("output = %q, want %q", output.String(), want)
 	}
 }
