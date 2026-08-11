@@ -2,13 +2,27 @@
 
 **Session ID:** ses_012b4cf1cffeTKtkZ8KoseUs1N
 **Created:** 8/10/2026, 5:09:15 PM
-**Updated:** 8/11/2026, 2:06:42 PM
+**Updated:** 8/11/2026, 7:59:01 PM
 
 ---
 
 ## Assistant
 
-The worktree is clean. I’ll add a small `atomicOutput` helper in `cmd/batch/main.go`; `run` will process into same-directory temporary files and commit each only after `batch.Process` succeeds.
+I’ll retain the aggregate progress line and add a malformed-record stderr line containing only the record number and `json.Unmarshal` error text, never the original JSON payload.
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+The parser error now travels as a compact string only. I’ll add the corresponding internal assertion, then verify the CLI’s stderr output and race safety.
 
 **Tool: apply_patch**
 
@@ -34,812 +48,34 @@ The worktree is clean. I’ll add a small `atomicOutput` helper in `cmd/batch/ma
 
 ## Assistant
 
-Implemented the minimal atomic-output patch in `cmd/batch/main.go`.
-
-| Item | Status |
-|---|---|
-| Changed | Added reusable `atomicOutput` helper |
-| Behavior | CSVs write to same-directory temporary files and rename only after successful processing |
-| Failure behavior | Temporary files are removed; existing final CSVs remain unchanged |
-| Verification | `go test ./...`, `go vet ./...`, and `git diff --check` passed |
-| Sample JSONL in repo | Yes, unchanged |
-| Missing edge case | Each CSV is atomic individually; a filesystem failure while renaming the second file can still leave the pair at different versions |
-
----
-
-## User
-
-add tests around it and commit in ptbr using the git logs to see how is the pattern here. 
-
----
-
-## Assistant
-
-I’ll add focused tests for commit and discard semantics, verify the suite, then commit the atomic-output change with a Portuguese message matching the repository history.
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: bash**
-
-**Tool: read**
-
----
-
-## Assistant
-
-The recent history uses Portuguese conventional prefixes such as `fix:` and `test:`. I’ll add two direct helper tests: commit replaces the destination only after staged content is closed, and discard removes the temporary file while preserving the existing destination.
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-The atomic helper tests pass, including under the race detector. I’ll commit only `cmd/batch/main.go` and `cmd/batch/main_test.go` with the Portuguese `fix:` convention used by the repository.
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-Committed `580a1ac` with message `fix: torna escrita dos CSVs atômica`.
-
-| Item | Status |
-|---|---|
-| Tested | Commit replaces the previous destination only after temporary output is finalized |
-| Tested | Discard removes the temporary file and preserves the previous destination |
-| Sample JSONL in repo | Yes, unchanged |
-| Changed | `cmd/batch/main.go`, `cmd/batch/main_test.go` |
-| Verification | `go test ./...`, `go test -race ./...`, `go vet ./...`, and `git diff --check` passed |
-| Worktree | Clean |
-| Missing edge case | The two CSVs are atomic individually; a failure while renaming the second file can still leave the pair at different versions |
-
----
-
-## User
-
-well i actually ended merging the a branch based on workers to do writting batches bounded by sequential writing still ocorruring in the end of each batch, this proved to be a gain in this machine, taking essentially 50-60% less wall time to batch, this should be tested and also the generate  cli has no tests too, you could add small tests to generate just to verify behavior since is a helper for testing. 
-
-❯ /usr/bin/time -v .local/batch -workers 8 .local/1m.jsonl
-Resultados do Batch
-
-Métrica                          Total
-Registros lidos                  1000000
-Registros Malformados            0
-Clubes ignorados por campeonato  333333
-Clubes Série A                   333334
-Clubes Série B                   333333
-Linhas de Clubes Geradas         666667
-Linhas de Jogadores Geradas      1333334
-        Command being timed: ".local/batch -workers 8 .local/1m.jsonl"
-        User time (seconds): 15.09
-        System time (seconds): 1.28
-        Percent of CPU this job got: 447%
-        Elapsed (wall clock) time (h:mm:ss or m:ss): 0:03.65
-        Average shared text size (kbytes): 0
-        Average unshared data size (kbytes): 0
-        Average stack size (kbytes): 0
-        Average total size (kbytes): 0
-        Maximum resident set size (kbytes): 21216
-        Average resident set size (kbytes): 0
-        Major (requiring I/O) page faults: 0
-        Minor (reclaiming a frame) page faults: 118679
-        Voluntary context switches: 41315
-        Involuntary context switches: 2985
-        Swaps: 0
-        File system inputs: 0
-        File system outputs: 426432
-        Socket messages sent: 0
-        Socket messages received: 0
-        Signals delivered: 0
-        Page size (bytes): 4096
-        Exit status: 0 
-
-
-this is the way i'm testing using the time bin to check the results i would like you to add a script of loggings that create a one file  just showing the 100k, 1m, 10m differences between sequential and batch on -workers 8 flag, to show the difference itself in the most human readable way possible keeping time output but showing better the way memory x cpu increases and wall time, the other thing is create tests to use workers too and check for invalid sequence or something like this, i've tested the checksum of files, but you can test too. this is all for now. 
-
----
-
-## Assistant
-
-I’ll inspect the worker implementation and generator CLI first, then add focused correctness tests and a benchmark-report script that runs sequential and `-workers 8` at 100k, 1m, and 10m records without changing batch production code.
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: bash**
-
-**Tool: glob**
-
-**Tool: read**
-
-**Tool: read**
-
-**Tool: read**
-
-**Tool: read**
-
----
-
-## Assistant
-
-The worker design preserves input order by storing each processed result at its input index and writing that slice sequentially. I’ll verify this across the 4,096-record batch boundary, compare sequential and eight-worker output bytes, cover invalid worker counts, and test generator output through its existing helper.
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-The tests now cover worker equivalence across a batch boundary, invalid worker configuration, and generator output. I’ll add an executable benchmark script that builds local binaries, verifies sequential/parallel CSV checksums, and writes a Markdown report with summary tables plus raw `/usr/bin/time -v` output.
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: read**
-
----
-
-## Assistant
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: read**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-Added worker, generator, and benchmark coverage.
-
-| Item | Status |
-|---|---|
-| Tested | Sequential and 8-worker processing produce byte-identical `clubs.csv` and `players.csv` across the 4,096-record batch boundary |
-| Tested | Worker path preserves malformed-record handling, input ordering, statistics, club rows, and player rows |
-| Tested | Zero defaults to sequential processing in `ProcessWithOptions`; negative worker counts fail before writing CSV headers |
-| Tested | Generator creates parent directories, emits requested record/player counts, IDs, and Série A/B/C rotation |
-| Added | `scripts/benchmark-workers.sh` builds local binaries, generates 100k/1m/10m datasets, compares sequential vs 8-worker CSVs byte-for-byte, and creates `.local/benchmark-workers/report.md` |
-| Benchmark report | Includes wall time, CPU percentage, peak RSS, speedup, reduction percentage, and complete `/usr/bin/time -v` output for each run |
-| Script verification | `bash -n scripts/benchmark-workers.sh` passed; full benchmark was not run because it intentionally includes 10m records |
-| Sample JSONL in repo | Yes, unchanged |
-| Changed | `internal/batch/batch_test.go`, `cmd/generate/main_test.go`, `scripts/benchmark-workers.sh` |
-| Verification | `go test ./...`, `go test -race ./...`, `go vet ./...`, and `git diff --check` passed |
-| Existing local changes preserved | `clubs.csv` and `players.csv` are modified by your load run and were not touched |
-| Issue found | `cmd/batch/main.go:54-56` prints an error for `-workers 0` but does not return; `ProcessWithOptions` then treats zero as one worker, so the CLI completes successfully despite the error text |
-
-
----
-
-## User
-
-well the benchmark script has two issues that i didn't explain in the last prompt, 1 it assumes that time is installed in the user running it,2 time-v is actually calling shell time keyword, you should  keep using gnu time  -v as i showed in the other prompt, but this is ok fixable keep the sabe behavior  run a bash -n to check syntax errors, another thing is to keep this the most honest possible to the user in ptbr outputs, even stderr, you should say to the user that gnu time is needed jsut for the benchmark not to use batch. we should keep the report.md and also output in text showing the echo of what is happening in the script, since the generate might take a while to generate 10M and also sequential batch is expensive in 10M inputs. ok show me everything you changed in the script. 
-
----
-
-## Assistant
-
-I’ll update only `scripts/benchmark-workers.sh`: detect and validate GNU `time -v`, emit Portuguese progress to stdout/stderr, and keep the Markdown report in Portuguese with the raw GNU time output.
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: read**
-
-**Tool: bash**
-
----
-
-## Assistant
-
-The script currently hardcodes `/usr/bin/time` and emits its report in English. I’ll replace that with explicit GNU-time discovery/validation, use only the resolved executable, and separate terminal progress from the Portuguese Markdown report.
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-Updated only `scripts/benchmark-workers.sh`.
-
-| Change | Result |
-|---|---|
-| GNU time detection | Uses `GNU_TIME_BIN` when provided, then validates `/usr/bin/time`, then `gtime`; each must support GNU `-v` |
-| Shell keyword avoidance | The script always invokes the resolved executable path, never the shell `time` keyword |
-| Missing dependency message | Prints Portuguese stderr explaining GNU time is required only for the benchmark, never for `batch` itself |
-| Terminal progress | Shows compilation, selected GNU time path, generation, sequential processing, and 8-worker processing for each dataset |
-| Report language | `report.md` is now Portuguese |
-| Report layout | Produces a complete summary table first, then raw GNU time output for sequential and parallel executions of 100k, 1m, and 10m |
-| Output integrity | Keeps byte-for-byte comparisons of both CSV outputs and aborts on a mismatch |
-| Verification | `bash -n scripts/benchmark-workers.sh` and `git diff --check` passed |
-| Sample JSONL in repo | Yes, unchanged |
-| Changed | Only `scripts/benchmark-workers.sh` |
-| Missing edge case | The full 100k/1m/10m benchmark was not run, because it intentionally performs the expensive workload |
-
----
-
-## User
-
-scripts/benchmark-workers.sh
-Compilando os binarios locais...
-Usando GNU time: /usr/bin/time
-[1/3] Gerando entrada com 100000 clubes...
-[1/3] Processando sequencialmente (100000 clubes)...
-[1/3] Processando com 8 workers (100000 clubes)...
-awk: warning: escape sequence `\(' treated as plain `('
-awk: warning: escape sequence `\)' treated as plain `)'
-awk: warning: escape sequence `\(' treated as plain `('
-awk: warning: escape sequence `\)' treated as plain `)'
-awk: cmd. line:1: fatal: division by zero attempted 
-
-tried on my machine and this happens, awk is giving errors back, look into it and fix this.
-
----
-
-## Assistant
-
-The parser treated the escaped parentheses as an awk regular expression and failed to extract wall time. I’ll switch metric extraction to literal substring matching and fail explicitly if a GNU time metric cannot be read.
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-Fixed the awk failure in `scripts/benchmark-workers.sh`.
-
-| Item | Status |
-|---|---|
-| Root cause | Awk interpreted escaped parentheses in `Elapsed \(wall clock\)` as an invalid regex pattern |
-| Fixed | `time_value` now uses literal substring matching with `index($0, metric)` |
-| Fixed | Wall-time lookup now searches for the literal `Elapsed (wall clock)` text |
-| Added | Explicit Portuguese error if any expected GNU time metric is absent, preventing division by zero |
-| Verification | `bash -n scripts/benchmark-workers.sh` and `git diff --check` passed |
-| Sample JSONL in repo | Yes, unchanged |
-| Changed | Only `scripts/benchmark-workers.sh` |
-| Missing edge case | The complete 100k/1m/10m workload was not rerun here |
-
----
-
-## User
-
-ok everything is commited, now for the final step i would like you to do a readme, like the enunciado tells us to, in the readme, you're gonna actually teach the user how to use batch, keep it short and simple, add the section of the benchmark showing how it was generated and take the table from the  report.md here on local put it in a assets/report.md or something so it survives github, and show the table there, you can show "this was generetaed by scripts/benchmark-workers.sh"  etc and tell about the gnu time need, another thing polish the pt-br of readme. make it beautiful but now too complex, keep it short and understandable and with tiny examples of how the project works, go ahead. 
-
----
-
-## Assistant
-
-I’ll inspect the generated local benchmark report and the current CLI behavior, then add a concise Portuguese README plus a tracked benchmark report under `assets/`.
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: bash**
-
-**Tool: read**
-
-**Tool: read**
-
-**Tool: read**
-
-**Tool: glob**
-
-**Tool: glob**
-
----
-
-## Assistant
-
-The local benchmark report contains complete 100k, 1m, and 10m results with byte-identical CSV verification. I’ll add a short Portuguese README and preserve its summary table in `assets/benchmark-workers.md`.
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: bash**
-
-**Tool: read**
-
-**Tool: read**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-Added polished Portuguese documentation.
-
-| Item | Status |
-|---|---|
-| Added | `README.md` with installation, sequential/parallel usage, generated outputs, tests, load generator, and benchmark instructions |
-| Added | `assets/benchmark-workers.md` with the 100k, 1m, and 10m benchmark table |
-| Documented | GNU `time -v` is required only for the benchmark, not for `batch` |
-| Documented | Benchmark script generation, byte-for-byte CSV verification, and local full-report location |
-| Sample JSONL in repo | Yes, documented as `sample_clubes.jsonl` |
-| Changed | `README.md` and `assets/benchmark-workers.md` only |
-| Verification | `go test ./...` and `git diff --check` passed |
-| Missing edge cases | Documentation files are uncommitted; no code behavior changed |
-
----
-
-## User
-
-no, integrate the table of report .md in the readme itself, also the title should be bigdatacorp batch desafio or something like that  and keep the asset of the complete report there. meaning link the full asset report but keep the table as evidence table in the readme itself, this is better. 
-
----
-
-## Assistant
-
-I’ll update the README title and embed the benchmark summary table, while retaining `assets/benchmark-workers.md` as the linked complete report.
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-Updated `README.md` as requested.
-
-| Item | Status |
-|---|---|
-| Title | `Desafio Batch BigDataCorp` |
-| Benchmark table | Embedded directly in the README |
-| Complete report | Kept in `assets/benchmark-workers.md` and linked from the README |
-| Verification | `git diff --check` passed |
-| Changed | `README.md` only in this update |
-| Sample JSONL in repo | Yes, unchanged |
-
----
-
-## User
-
-after stress testing i've noticed that memory in RSS was growing too much, do this two things for me, change i've added 32mib as default for the batch size but capping like this is dumb, add the flag -maxsize that will receiva a int indicating mib size of the batch, do the conversion to << 20 so it will be in mib  and change  behavior in parallel.go to work with the flag, if not, default to 32mib.
-
-the other thing is to update the readme, and testing. this include creating a new test if necessary, most of the jsons for this cases will not actually have 512/32 mib sizing in lines but it's good to at least let the user choose. show me the result of what you changed 
-
----
-
-## Assistant
-
-I’ll inspect the current worker batching changes, then wire `-maxsize` through the CLI and parallel processor, add focused option tests, and update the README without altering unrelated local work.
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: bash**
-
-**Tool: read**
-
-**Tool: read**
-
-**Tool: read**
-
-**Tool: read**
-
-**Tool: read**
-
----
-
-## Assistant
-
-The current cap is hardcoded at `32 << 20` after the CLI boundary. I’ll make the CLI accept MiB through `-maxsize`, convert it with `<< 20`, retain 32 MiB as the default in the batch package, and ensure invalid values fail before output headers are written.
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-The CLI now accepts `-maxsize` in MiB and passes bytes to the batch package. I’ll add a parallel-output equivalence test using a one-byte batch limit, plus invalid internal option coverage, so the new limit is exercised even with small fixtures.
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-Implemented configurable parallel batch memory limits.
-
-| Item | Result |
-|---|---|
-| New flag | `-maxsize N`, where `N` is the maximum batch size in MiB |
-| Default | `32` MiB when `-maxsize` is omitted |
-| Conversion | CLI converts MiB to bytes with `maxSize << 20` before passing options to the batch processor |
-| Parallel behavior | `processParallel` now receives the configured byte limit instead of a hardcoded cap |
-| Validation | `-maxsize 0` or a negative internal byte limit fails before CSV headers are written |
-| Example | `go run ./cmd/batch -workers 8 -maxsize 16 sample_clubes.jsonl` |
-| Tested | One-byte parallel batches preserve byte-identical CSVs and stats relative to sequential execution |
-| Tested | Default, worker counts, invalid worker count, and invalid max batch size |
-| README | Documents `-maxsize`, its default, MiB unit, and the behavior for a single oversized record |
-| Sample JSONL in repo | Yes, unchanged |
-| Changed | `cmd/batch/main.go`, `cmd/batch/main_test.go`, `internal/batch/{processor,parallel,batch_test}.go`, `README.md` |
-| Verification | `go test ./...`, `go test -race ./...`, `go vet ./...`, and `git diff --check` passed |
-| Missing edge case | No fixture contains an actual multi-MiB JSONL record; the one-byte limit test verifies the option is honored with small input |
-
----
-
-## User
-
-Ok one last thing, this project is lacking logging so added it in the -v flag or maybe -l you can choose what is more pattern to human usage , i was thinking something in every 100k or something, but i would need to stderr to show  in the logs when a malformed line appears something really simple like "malformed line at:%d" or something like that, but in ptbr, add this small logging with processing, malformed and ignored,  keep it portable with '>' pipes, and really simple, you can use the tabwriter, keep in mind that the actual size of a file can be < 100k so it should be 100K for larger files and 10% of the actual size for small files. after that you can add tests and refactor tests that are  expecting hard coded outputs. update the readme too for it.
-
----
-
-## Assistant
-
-I’ll use `-v`, the conventional verbose flag. Batch processing will emit ordered progress events through an `io.Writer` callback, so logs remain portable with stderr redirection (`2>`) and can be tested without coupling the processor to terminal formatting.
-
-**Tool: read**
-
-**Tool: read**
-
----
-
-## Assistant
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-Verbose logging now receives ordered processor events after each result is written, so it remains safe in parallel mode. I’ll add one processor event test, one CLI stderr test for malformed/ignored/progress logs, and document redirection with `2>`.
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-Added verbose processing logs with `-v`.
-
-| Item | Result |
-|---|---|
-| New flag | `-v` enables logs on `stderr` |
-| Portable redirection | `go run ./cmd/batch -v -workers 8 sample_clubes.jsonl 2> processamento.log` |
-| Large input progress | Logs every 100,000 processed records |
-| Small input progress | Logs at each 10% of input bytes processed for files below 100 kB |
-| Malformed input | Logs `Linha malformada` with the record number |
-| Ignored club | Logs `Clube ignorado` with the record number |
-| Parallel order | Progress events are emitted after sequential output writing, preserving input order even with workers |
-| Formatting | Uses `tabwriter` for aligned stderr logs |
-| Tested | Ordered progress callbacks for valid, malformed, and ignored records |
-| Tested | Verbose CLI logs include progress, malformed-line, and ignored-club messages |
-| README | Documents `-v`, thresholds, stderr behavior, and `2>` redirection |
-| Sample JSONL in repo | Yes, unchanged |
-| Changed | `cmd/batch/main.go`, `cmd/batch/main_test.go`, `internal/batch/{processor,sequential,parallel,batch_test}.go`, `README.md` |
-| Verification | `go test ./...`, `go test -race ./...`, `go vet ./...`, and `git diff --check` passed |
-| Missing edge case | No fixture has enough records to exercise the 100,000-record logging interval; callback ordering is verified with parallel batches |
-
----
-
-## User
-
-only log stderr by line meaning only the malformed json. and keep the tab writing for progress. since metrias already show the 'ignorados' you don't need to put this here. 
-
----
-
-## Assistant
-
-I’ll remove ignored-club verbose events entirely, retain malformed-line messages on stderr, and keep tabwriter-formatted progress output. Tests and README will be narrowed to that behavior.
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-Adjusted verbose logging as requested.
-
-| Item | Result |
-|---|---|
-| `stderr` line logs | Only JSON malformed records emit `Linha malformada` |
-| Ignored clubs | No per-club verbose log; they remain represented only by final metrics |
-| Progress | Remains tabwriter-formatted in `stderr` |
-| Tests | Assert malformed/progress logs are present and ignored-club logs are absent |
-| README | Clarifies malformed-line logging and final ignored-club metrics |
-| Sample JSONL in repo | Yes, unchanged |
-| Verification | `go test ./...`, `go test -race ./...`, `go vet ./...`, and `git diff --check` passed |
-| Local changes preserved | Existing `clubs.csv`, `players.csv`, and temporary `.clubs.csv-*` / `.players.csv-*` files were not modified |
-
-
----
-
-## User
-
-one more time, it should be: processing N | malformed x | skipped y |  just this in the logging, and the stderr is ok. 
-
----
-
-## Assistant
-
-I’ll reduce verbose output to periodic aggregate lines only: processed records, malformed records, and skipped clubs. No individual-record log messages will remain.
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: apply_patch**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-**Tool: bash**
-
----
-
-## Assistant
-
-**Tool: todowrite**
-
----
-
-## Assistant
-
-Verbose output now contains aggregate progress lines only:
+Updated verbose malformed-record logging.
 
 ```text
-Processamento  N registros  |  Malformados  X  |  Ignorados  Y
+Registro  2  malformado:  invalid character 'j' looking for beginning of value
+Processamento  3 registros  |  Malformados  1  |  Ignorados  1
 ```
 
 | Item | Result |
 |---|---|
-| Removed | Individual malformed-line and ignored-club messages |
-| Retained | Tabwriter-formatted progress on `stderr` |
-| Progress totals | Records processed, malformed JSON count, and skipped-club count |
-| Tests | Verify ordered aggregate counters and that verbose stderr has no individual-record messages |
-| README | Documents aggregate verbose logging |
+| Malformed log | Includes record number and JSON parsing error |
+| Payload safety | Never prints the original JSON line |
+| Aggregate log | Unchanged: processed, malformed, and skipped totals |
+| Tests | Verify parser errors propagate only for malformed records and stderr includes the error without payload content |
+| README | Documents the record number/error behavior |
 | Sample JSONL in repo | Yes, unchanged |
 | Verification | `go test ./...`, `go test -race ./...`, `go vet ./...`, and `git diff --check` passed |
-| Local files preserved | Existing temporary `.clubs.csv-*` and `.players.csv-*` files were not modified |
 
 ---
 
 ## User
 
-Don't print the actual JSON line because it can be huge fix the aggregation to logging, look for not used code too in the logging parts and summarize the changes and tests. 
+ok we gonna do some final refactors now i deleted sequential.go  because it was duplicated code, now  you can verify if this has consequences, put names in t.run inside testings please look at the ./local/enunciado.pdf to see which tests should care if theres not a test that clearly satisfies each bullet point in the "regras de negócio e de formatação" part. 
 
 ---
 
 ## Assistant
 
-The current verbose path carries only counters and byte totals, not input content. I’ll verify that logging data flow, add a regression assertion that malformed JSON text never reaches stderr, and remove any dead logging code if found.
+I’ll inspect the sequential-path deletion and current test suite against every business/formatting rule in the enunciado, then refactor test cases to use named `t.Run` subtests and add only behavior tests supported by the implementation.
 
 **Tool: todowrite**
 
@@ -847,7 +83,15 @@ The current verbose path carries only counters and byte totals, not input conten
 
 ## Assistant
 
-**Tool: grep**
+**Tool: bash**
+
+**Tool: read**
+
+**Tool: glob**
+
+**Tool: glob**
+
+**Tool: read**
 
 **Tool: read**
 
@@ -859,7 +103,41 @@ The current verbose path carries only counters and byte totals, not input conten
 
 ## Assistant
 
-The verbose pipeline already contains no line payload, and the inspection found one unnecessary `processedRecord` parameter still being passed into `reportProgress`. I’ll remove that data path and add a large malformed-payload regression test.
+Deleting `sequential.go` makes `Process` use the ordered batch path even with one worker; it preserves CSV order and counters but now buffers up to a one-worker batch. I found the source rules covered except that the championship test should explicitly prove excluded clubs are absent from both CSVs. I’ll add that assertion and name every table case with `t.Run`.
+
+**Tool: read**
+
+**Tool: grep**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+All table-driven cases now run as named subtests, and the worker-equivalence test no longer refers to the removed sequential implementation. I’ll run the full suite and race detector to verify the single parallel path preserves behavior.
+
+**Tool: bash**
+
+---
+
+## Assistant
 
 **Tool: apply_patch**
 
@@ -885,18 +163,733 @@ The verbose pipeline already contains no line payload, and the inspection found 
 
 ## Assistant
 
-Reviewed and tightened the verbose logging path.
+The `sequential.go` deletion has no output or counter regression: one-worker and eight-worker processing produce identical CSV bytes and statistics across batch boundaries. The one-worker path now uses the same bounded batch implementation, so it retains up to one configured batch in memory rather than only one decoded line.
+
+| Enunciado Rule | Test Coverage |
+|---|---|
+| Série A/B filter | Eligible clubs are retained; Série C is absent from both CSVs |
+| 1:N club/player link | Player rows carry the parent `club_id`; eligible clubs with no players remain only in `clubs.csv` |
+| Colors | Pipe joining plus empty and missing colors |
+| Dates | Valid, padded, invalid, and absent dates |
+| Missing/null fields | Empty CSV fields, including nullable nickname and player fields |
+| CSV format | Exact headers/order, comma separator, RFC 4180 escaping, and UTF-8 values |
+| Robustness | Malformed JSON is skipped while later records continue |
+| Large volume | Worker tests cross batch boundaries and verify one-worker/eight-worker byte equality; load benchmarks remain the large-scale evidence |
 
 | Item | Result |
 |---|---|
-| JSON payload logging | No input JSON content is logged to `stderr` |
-| Cleanup | Removed the unused `processedRecord` parameter from `reportProgress` |
-| Aggregation | Logs contain only processed count, malformed total, and skipped-club total |
-| Regression test | Uses a 17,000-character malformed payload and verifies none of it appears in verbose stderr |
+| Refactored | All table-driven cases now use named `t.Run` subtests |
+| Renamed | Worker equivalence test no longer refers to the removed sequential implementation |
+| Added | Explicit assertion that filtered clubs do not enter `clubs.csv` |
+| Added | Explicit UTF-8 assertions for `São Paulo` and `Estêvão` |
+| Changed | Test files only: `cmd/batch/main_test.go`, `cmd/generate/main_test.go`, `internal/batch/batch_test.go` |
 | Sample JSONL in repo | Yes, unchanged |
-| Changed | `internal/batch/{processor,sequential,parallel}.go`, `cmd/batch/main_test.go` |
 | Verification | `go test ./...`, `go test -race ./...`, `go vet ./...`, and `git diff --check` passed |
-| Missing edge case | No test uses a real multi-MiB malformed JSON line; the large-payload regression verifies the logging boundary |
+| Residual ambiguity | The enunciado says incomplete records are excluded but also says absent/null fields become empty. Tests follow the implemented empty-field behavior; no required-field validation rule exists yet.
+
+---
+
+## User
+
+the enunciando is only saying to skip so is not ambiguity and we already do this, i have an edge case here where players are present in a line where club has no club id, so this line based on my code should not write  the player row, but club row ok, since theres no validation for id in clubs. 
+
+---
+
+## Assistant
+
+A club without `club_id` can still produce its club row, but a player row cannot satisfy the required 1:N link. I’ll preserve the club row and suppress only its player rows for absent or null IDs, with focused coverage for both cases.
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: read**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+Implemented the missing `club_id` behavior.
+
+| Item | Result |
+|---|---|
+| Club without ID | Still generates its `clubs.csv` row |
+| Players under that club | Do not generate `players.csv` rows because the required parent link is unavailable |
+| Covered cases | Missing `club_id` and `club_id: null` |
+| Test style | Added named `t.Run` subtests |
+| Sample JSONL in repo | Yes, unchanged |
+| Changed | `internal/batch/transform.go`, `internal/batch/batch_test.go` |
+| Verification | `go test ./...`, `go test -race ./...`, `go vet ./...`, and `git diff --check` passed |
+| Missing edge cases | Whitespace-only `club_id` is still considered present, matching the current string-field behavior |
+
+---
+
+## User
+
+fiix this missing edge case, i thing a strings.trimspace only for ids is ok enough
+
+---
+
+## Assistant
+
+I’ll treat whitespace-only `club_id` values as missing for the player-link decision while preserving the existing club-row value behavior, and add the corresponding named test case.
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+Whitespace-only `club_id` values now suppress player rows.
+
+| Item | Result |
+|---|---|
+| Detection | Uses `strings.TrimSpace(club.ClubID)` only to decide whether player rows can be linked |
+| Club row | Remains written with its original ID value, including whitespace |
+| Player rows | Skipped for missing, null, and whitespace-only club IDs |
+| Tests | Added named whitespace-only ID subtest alongside missing/null cases |
+| Sample JSONL in repo | Yes, unchanged |
+| Changed | `internal/batch/transform.go`, `internal/batch/batch_test.go` |
+| Verification | `go test ./...`, `go test -race ./...`, `go vet ./...`, and `git diff --check` passed |
+
+---
+
+## User
+
+heres the next thing you're going to do, in the readme you're going to map  only one (max 2 if really needed )  lines of go test -v ./... in the tests, you will do something like "this is the command: go tests -v ./..." this is what it  test, map this with the bullets we just discussed that exists in the enunciado. 
+
+---
+
+## Assistant
+
+I’ll replace the generic test commands in the README with one verbose command and a concise mapping from the enunciado’s rules to the covered behaviors.
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+Updated the README test section.
+
+| Item | Result |
+|---|---|
+| Test command | `go test -v ./...` |
+| Mapped rules | Championship filter, 1:N linking, missing/null fields, colors, invalid dates, CSV formatting, malformed JSON, continuity, and worker equivalence |
+| Sample JSONL in repo | Yes, unchanged |
+| Changed | `README.md` only in this update |
+| Verification | `git diff --check` passed |
+| Existing local changes | Test and transform changes remain preserved |
+
+---
+
+## User
+
+you did not  made the actuall mappin i want somthing like this here: 
+
+- bullet point
+  -this is solved by this test here : 
+ === RUN   TestNormalizeDate/ausente
+--- PASS: TestNormalizeDate (0.00s) 
+
+sample like this,  understood? 
+
+---
+
+## Assistant
+
+I’ll make the README mapping explicit, using the exact verbose subtest names emitted by `go test -v ./...` for each enunciado rule.
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+The mapped test names all match the actual `go test -v ./...` output. I’ll remove Markdown trailing whitespace while preserving each rule-to-test association.
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+Updated the README with explicit enunciado-to-test mapping.
+
+| Item | Result |
+|---|---|
+| Test command | `go test -v ./...` |
+| Mapping | Every business/formatting rule now names its exact `=== RUN Test...` coverage |
+| Example | Championship filtering maps to `TestProcessWritesPlayersOnlyForEligibleClubs` |
+| Coverage listed | Filter, 1:N link, colors, dates, empty fields, CSV format, robustness, volume/order |
+| Sample JSONL in repo | Yes, unchanged |
+| Changed | `README.md` only in this update |
+| Verification | `go test -v ./...` and `git diff --check` passed |
+
+---
+
+## User
+
+let's also change the benchmark script and readme part of it, we are gonna generate 10m file with 2 players and do a test of 1,2,4,8,16 workers and put this in a table, only showing the actual gains  and where the addition of workers stop benefiting the runtime itself.  instead of all the bloated, i just want something like elapsed time, and memory used. just this is perfected  already and number of works in teh same file,  explain this in the readme in the table too. 
+
+---
+
+## Assistant
+
+I’ll simplify the benchmark to one generated 10M-record input with two players per club, run it at 1/2/4/8/16 workers, and report only elapsed time, RSS, incremental gain, and the first configuration where adding workers stops helping.
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: read**
+
+**Tool: read**
+
+**Tool: read**
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+The current benchmark still reports three input sizes, CPU metrics, raw GNU time blocks, and only one parallel setting. I’ll replace it with a single 10M/2-player worker-scaling run and make `assets/benchmark-workers.md` the concise generated report.
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+The benchmark now uses one shared 10M/2-player input and reports only worker count, elapsed time, RSS, and incremental gain. It retains byte-for-byte output validation internally, without adding it to the report.
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+Simplified the worker benchmark to focus on scaling limits.
+
+| Item | Result |
+|---|---|
+| Input | One generated JSONL with 10,000,000 clubs and 2 players per club |
+| Worker counts | `1`, `2`, `4`, `8`, `16` |
+| Validation | Each worker count still produces CSVs byte-identical to the one-worker baseline |
+| Report columns | Workers, elapsed time, maximum RSS, incremental gain versus previous worker count |
+| Plateau | The report identifies the first worker count with `sem ganho` |
+| Removed from report | Multiple input sizes, CPU percentage, speedup summary, and raw GNU `time -v` blocks |
+| Report location | `assets/benchmark-workers.md`, updated by the script for the current machine |
+| README | Documents methodology and explains each report column |
+| Script validation | `bash -n scripts/benchmark-workers.sh` and `git diff --check` passed |
+| Sample JSONL in repo | Yes, unchanged |
+| Changed | `scripts/benchmark-workers.sh`, `README.md`, `assets/benchmark-workers.md` |
+| Not run | The 10M benchmark was not executed here; run `scripts/benchmark-workers.sh` to populate the tracked results table |
+
+---
+
+## User
+
+you have permission to execute the benchmark.sh and write those in the readme. 
+
+---
+
+## Assistant
+
+I’ll run the full 10M benchmark now. It will generate the shared input, verify every worker result against the one-worker CSVs, update `assets/benchmark-workers.md`, and then I’ll copy the resulting table into the README.
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+The full benchmark completed successfully for all five worker counts, including byte-for-byte CSV validation against the one-worker output. I’ll read the generated table and embed it in the README.
+
+**Tool: read**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+Ran the full benchmark and wrote the measured table to both `README.md` and `assets/benchmark-workers.md`.
+
+| Workers | Elapsed | Max RSS | Gain vs previous |
+|---:|---:|---:|---:|
+| 1 | 2:15.33 | 9.5 MiB | base |
+| 2 | 1:21.74 | 10.1 MiB | 39.6% faster |
+| 4 | 0:58.96 | 12.2 MiB | 27.9% faster |
+| 8 | 0:53.08 | 19.9 MiB | 10.0% faster |
+| 16 | 0:49.44 | 37.3 MiB | 6.9% faster |
+
+| Item | Result |
+|---|---|
+| Benchmark input | 10,000,000 clubs, 2 players per club |
+| Worker counts | 1, 2, 4, 8, 16 |
+| CSV validation | Every run matched the one-worker `clubs.csv` and `players.csv` byte-for-byte |
+| Plateau | Not reached; all worker increases reduced elapsed time |
+| Changed | `README.md`, `assets/benchmark-workers.md`, `scripts/benchmark-workers.sh` |
+| Verification | Benchmark completed successfully; `git diff --check` passed |
+| Sample JSONL in repo | Yes, unchanged |
+
+---
+
+## User
+
+ok remove assets, we don't need anymore, only the readme table is good enough, and say it was generated by the .sh, also put my cpu, meaning where it was actually benched tested 
+
+---
+
+## Assistant
+
+I’ll remove the now-redundant tracked benchmark asset, collect this machine’s CPU model, and annotate the README table with the script that generated it and the benchmark hardware.
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: read**
+
+**Tool: bash**
+
+**Tool: grep**
+
+---
+
+## Assistant
+
+The benchmark ran on an AMD Ryzen 7 5825U with Radeon Graphics, 8 physical cores and 16 threads. I’ll remove the asset report, return generated reports to `.local`, and retain the methodology, CPU, and measured table directly in the README.
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+Removed the benchmark asset and kept the benchmark evidence in the README.
+
+| Item | Result |
+|---|---|
+| Removed | `assets/benchmark-workers.md` |
+| README | States the table was generated by `scripts/benchmark-workers.sh` |
+| Benchmark CPU | AMD Ryzen 7 5825U with Radeon Graphics, 8 cores / 16 threads |
+| Script report | Now writes locally to `.local/benchmark-workers/report.md` |
+| README table | Retains 1/2/4/8/16-worker elapsed time, RSS, and incremental gains |
+| Sample JSONL in repo | Yes, unchanged |
+| Changed | `README.md`, `scripts/benchmark-workers.sh`, removed `assets/benchmark-workers.md` |
+| Verification | `bash -n scripts/benchmark-workers.sh` and `git diff --check` passed |
+
+---
+
+## User
+
+commands itself should be only <command name>  what it does a small tabe in executar no need to over explain 
+
+it could be something like 
+
+-workers  something 
+-maxbatchsize something 
+-v  something 
+
+---
+
+## Assistant
+
+I’ll simplify the execution section into a compact command/options table, keeping only the command name and a short description for `-workers`, `-maxsize`, and `-v`.
+
+**Tool: read**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+Simplified the README execution section.
+
+| Option | Description |
+|---|---|
+| `-workers N` | Worker count |
+| `-maxsize N` | Batch size in MiB |
+| `-v` | Processing logs on `stderr` |
+
+| Item | Result |
+|---|---|
+| README | Removed detailed flag explanations and redundant examples |
+| Verification | `git diff --check` passed |
+| Sample JSONL in repo | Yes, unchanged |
+| Existing changes | Benchmark asset deletion and script update remain preserved |
+
+---
+
+## User
+
+The benchmark script is not keeping the actual best runtime possible for the batch Métrica                          Total
+Registros lidos                  10000000
+Registros Malformados            0
+Clubes ignorados por campeonato  3333333
+Clubes Série A                   3333334
+Clubes Série B                   3333333
+Linhas de Clubes Geradas         6666667
+Linhas de Jogadores Geradas      13333334
+        Command being timed: "go run ./cmd/batch -workers 8 .local/benchmark-workers/10000000.jsonl"
+        User time (seconds): 161.48
+        System time (seconds): 14.39
+        Percent of CPU this job got: 429%
+        Elapsed (wall clock) time (h:mm:ss or m:ss): 0:40.96
+        Average shared text size (kbytes): 0
+        Average unshared data size (kbytes): 0
+        Average stack size (kbytes): 0
+        Average total size (kbytes): 0
+        Maximum resident set size (kbytes): 22280
+        Average resident set size (kbytes): 0
+        Major (requiring I/O) page faults: 13
+        Minor (reclaiming a frame) page faults: 1152216
+        Voluntary context switches: 379591
+        Involuntary context switches: 34835
+        Swaps: 0
+        File system inputs: 12935992
+        File system outputs: 3473920
+        Socket messages sent: 0
+        Socket messages received: 0
+        Signals delivered: 0
+        Page size (bytes): 4096
+        Exit status: 0  testing locally 8 workers are averaging 39-40s everytime. so maybe is overhead or noise. 
+
+---
+
+## Assistant
+
+The current script records one timing per worker count, so it can preserve a noisy or throttled run like the 53-second eight-worker result. I’ll change it to run each configuration three times, validate each CSV against the one-worker baseline, and report the lowest elapsed time with the RSS from that same run.
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+The script now records the best of three runs per worker setting, with a stable one-worker CSV baseline and a reusable candidate directory to avoid retaining fifteen large output pairs. I’ll validate its syntax, then rerun the benchmark under the new methodology so the README no longer shows the older single-run numbers.
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## User
+
+no need to run the actuall script but we gonna change something in it, you're gonna to write the script in a way that write  1M jsonl with 26 players and run the batch isolated with 1 , 2, 4 ,8 ,16 workers in order and write the report, no noise, no overhead, i want the most accurate time possible. 
+
+---
+
+## Assistant
+
+The long benchmark was stopped after the first run of the second repetition; I’ll not rerun it. I’ll simplify the script to one pre-built, cache-warmed 1M-record input with 26 players per club, then time only one isolated batch process for each worker count in the requested order.
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: read**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+Reconfigured the benchmark for a single isolated scaling pass.
+
+| Item | Result |
+|---|---|
+| Input | 1,000,000 clubs with 26 players per club |
+| Worker order | `1`, `2`, `4`, `8`, `16` |
+| Timing scope | Only the compiled `batch` process is measured |
+| Outside timing | Build, input generation, input-cache warming, and CSV comparison |
+| Isolation | Each worker count writes to its own run directory |
+| Correctness | Every worker output is compared byte-for-byte with the 1-worker baseline |
+| Report | `.local/benchmark-workers/report.md` shows elapsed time, RSS, incremental gain, and the first no-gain worker count |
+| README | Documents the new methodology and benchmark CPU: AMD Ryzen 7 5825U, 8 cores / 16 threads |
+| Verification | `bash -n scripts/benchmark-workers.sh` and `git diff --check` passed |
+| Not run | The new 1M/26-player benchmark was not executed |
+| Local changes preserved | Existing modified `clubs.csv` and `players.csv` were not touched |
+
+---
+
+## User
+
+ok i runned the  script now you can update the readme with the actual values 
+
+---
+
+## Assistant
+
+I’ll read the newly generated local benchmark report and copy its measured worker table into the README.
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: read**
+
+**Tool: read**
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+The new run completed through 16 workers with byte-identical CSVs and continued improvements at every step. I’ll embed that measured table in the README.
+
+**Tool: apply_patch**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+`git diff --check` cannot process the large locally modified `players.csv`. I’ll validate the documentation and script paths directly without touching those user-generated CSV files.
+
+**Tool: bash**
+
+---
+
+## Assistant
+
+**Tool: todowrite**
+
+---
+
+## Assistant
+
+Updated the README with the new measured benchmark values.
+
+| Workers | Elapsed | Max RSS | Gain vs previous |
+|---:|---:|---:|---:|
+| 1 | 1:21.56 | 19.4 MiB | base |
+| 2 | 0:50.62 | 29.4 MiB | 37.9% faster |
+| 4 | 0:35.43 | 46.3 MiB | 30.0% faster |
+| 8 | 0:29.53 | 83.7 MiB | 16.7% faster |
+| 16 | 0:27.49 | 132.8 MiB | 6.9% faster |
+
+| Item | Result |
+|---|---|
+| Benchmark input | 1,000,000 clubs, 26 players per club |
+| CSV validation | All worker outputs matched the 1-worker baseline byte-for-byte |
+| Plateau | Not reached through 16 workers |
+| Sample JSONL in repo | Yes, unchanged |
+| Changed | `README.md` only in this update |
+| Validation | Scoped `git diff --check -- README.md scripts/benchmark-workers.sh` passed |
+| Note | Full `git diff --check` cannot process the large user-modified `players.csv`; it was not modified |
 
 ---
 
