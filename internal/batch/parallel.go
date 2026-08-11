@@ -96,7 +96,7 @@ func processBatch(lines [][]byte, workers int) []processedRecord {
 
 		wg.Add(1)
 
-		go func(start, ent int) {
+		go func(start, end int) {
 			defer wg.Done()
 
 			for i := start; i < end; i++ {
