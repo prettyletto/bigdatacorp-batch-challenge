@@ -1,6 +1,7 @@
 package batch
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,44 @@ var playerHeader = []string{
 	"Data de Estreia",
 	"Posição",
 	"Número da Camisa",
+}
+
+type processedRecord struct {
+	malformed bool
+	filtered  bool
+
+	championship string
+	clubRow      []string
+	playersRows  [][]string
+}
+
+func processLine(line []byte) processedRecord {
+	var club Club
+
+	if err := json.Unmarshal(line, &club); err != nil {
+		return processedRecord{
+			malformed: true,
+		}
+	}
+
+	championship, ok := filterChampionship(club.Championship)
+	if !ok {
+		return processedRecord{
+			filtered: true,
+		}
+	}
+
+	playerRows := make([][]string, len(club.Players))
+
+	for i, player := range club.Players {
+		playerRows[i] = playerRow(club.ClubID, player)
+	}
+
+	return processedRecord{
+		championship: championship,
+		clubRow:      clubRow(club),
+		playersRows:  playerRows,
+	}
 }
 
 func clubRow(club Club) []string {

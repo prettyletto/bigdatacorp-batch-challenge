@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -21,15 +22,43 @@ func main() {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
-	if len(args) != 1 {
-		fmt.Fprintln(stderr, "uso: batch <input.jsonl>")
+	flags := flag.NewFlagSet(
+		"batch",
+		flag.ContinueOnError,
+	)
+
+	flags.SetOutput(stderr)
+
+	var workers int
+
+	flags.IntVar(
+		&workers,
+		"workers",
+		1,
+		"quantidadede workers para processamento",
+	)
+
+	flags.Usage = func() {
+		fmt.Fprintln(stderr, "uso: batch [-workers N] <input.json>")
+	}
+
+	if err := flags.Parse(args); err != nil {
 		return 1
 	}
 
-	inputPath := args[0]
+	if flags.NArg() != 1 {
+		flags.Usage()
+		return 1
+	}
+
+	if workers < 1 {
+		fmt.Fprintln(stderr, "erro: workers deve ser maior que zero")
+	}
+
+	inputPath := flags.Arg(0)
 
 	if !isJSONL(inputPath) {
-		fmt.Fprintln(stderr, "erro: arquivo fora da extensão .jsonl")
+		fmt.Fprintf(stderr, "erro: arquivo fora da extensão .jsonl")
 		return 1
 	}
 
@@ -54,7 +83,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	defer playersOutput.Discard()
 
-	stats, err := batch.Process(inputFile, clubsOutput.file, playersOutput.file)
+	stats, err := batch.ProcessWithOptions(inputFile, clubsOutput.file, playersOutput.file,batch.Options{Workers: workers} )
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao processar arquivo: %v\n", err)
 		return 1
