@@ -11,6 +11,11 @@ import (
 	"github.com/prettyletto/bigdatacorp-batch-challenge/internal/batch"
 )
 
+type atomicOutput struct {
+	file        *os.File
+	destination string
+}
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -35,29 +40,62 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	defer inputFile.Close()
 
-	clubsFile, err := os.Create("clubs.csv")
+	clubsOutput, err := createAtomicOutput("clubs.csv")
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao criar clubs.csv: %v\n", err)
 		return 1
 	}
-	defer clubsFile.Close()
+	defer clubsOutput.Discard()
 
-	playersFile, err := os.Create("players.csv")
+	playersOutput, err := createAtomicOutput("players.csv")
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao criar players.csv: %v\n", err)
 		return 1
 	}
-	defer playersFile.Close()
+	defer playersOutput.Discard()
 
-	stats, err := batch.Process(inputFile, clubsFile, playersFile)
+	stats, err := batch.Process(inputFile, clubsOutput.file, playersOutput.file)
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao processar arquivo: %v\n", err)
+		return 1
+	}
+	if err := clubsOutput.Commit(); err != nil {
+		fmt.Fprintf(stderr, "erro ao finalizar clubs.csv: %v\n", err)
+		return 1
+	}
+	if err := playersOutput.Commit(); err != nil {
+		fmt.Fprintf(stderr, "erro ao finalizar players.csv: %v\n", err)
 		return 1
 	}
 
 	printStats(stdout, stats)
 
 	return 0
+}
+
+func createAtomicOutput(destination string) (*atomicOutput, error) {
+	file, err := os.CreateTemp(
+		filepath.Dir(destination),
+		"."+filepath.Base(destination)+"-*",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &atomicOutput{file: file, destination: destination}, nil
+}
+
+func (output *atomicOutput) Commit() error {
+	if err := output.file.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(output.file.Name(), output.destination)
+}
+
+func (output *atomicOutput) Discard() {
+	_ = output.file.Close()
+	_ = os.Remove(output.file.Name())
 }
 
 func isJSONL(path string) bool {

@@ -89,6 +89,66 @@ func TestRunGeneratesCSVFilesFromSample(t *testing.T) {
 	}
 }
 
+func TestAtomicOutputCommitReplacesDestination(t *testing.T) {
+	destination := filepath.Join(t.TempDir(), "clubs.csv")
+	if err := os.WriteFile(destination, []byte("previous"), 0o600); err != nil {
+		t.Fatalf("creating destination: %v", err)
+	}
+
+	output, err := createAtomicOutput(destination)
+	if err != nil {
+		t.Fatalf("creating atomic output: %v", err)
+	}
+	temporaryPath := output.file.Name()
+	if _, err := output.file.WriteString("updated"); err != nil {
+		t.Fatalf("writing temporary output: %v", err)
+	}
+
+	if err := output.Commit(); err != nil {
+		t.Fatalf("committing output: %v", err)
+	}
+
+	content, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatalf("reading destination: %v", err)
+	}
+	if string(content) != "updated" {
+		t.Fatalf("destination content = %q, want %q", content, "updated")
+	}
+	if _, err := os.Stat(temporaryPath); !os.IsNotExist(err) {
+		t.Fatalf("temporary output should not exist after commit, stat error = %v", err)
+	}
+}
+
+func TestAtomicOutputDiscardPreservesDestination(t *testing.T) {
+	destination := filepath.Join(t.TempDir(), "players.csv")
+	if err := os.WriteFile(destination, []byte("previous"), 0o600); err != nil {
+		t.Fatalf("creating destination: %v", err)
+	}
+
+	output, err := createAtomicOutput(destination)
+	if err != nil {
+		t.Fatalf("creating atomic output: %v", err)
+	}
+	temporaryPath := output.file.Name()
+	if _, err := output.file.WriteString("updated"); err != nil {
+		t.Fatalf("writing temporary output: %v", err)
+	}
+
+	output.Discard()
+
+	content, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatalf("reading destination: %v", err)
+	}
+	if string(content) != "previous" {
+		t.Fatalf("destination content = %q, want %q", content, "previous")
+	}
+	if _, err := os.Stat(temporaryPath); !os.IsNotExist(err) {
+		t.Fatalf("temporary output should not exist after discard, stat error = %v", err)
+	}
+}
+
 func TestIsJSONL(t *testing.T) {
 	for _, tt := range []struct {
 		path string
