@@ -39,7 +39,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	)
 
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "uso: batch [-workers N] <input.json>")
+		fmt.Fprintln(stderr, "uso: batch [-workers N] <input.jsonl>")
 	}
 
 	if err := flags.Parse(args); err != nil {
