@@ -58,12 +58,7 @@ func ProcessWithOptions(r io.Reader, clubsOutput, playersOutput io.Writer, optio
 		err   error
 	)
 
-	if workers == 1 {
-		stats, err = processSequential(r, clubsWriter, playersWriter, options.OnProgress)
-	} else {
-		stats, err = processParallel(r, clubsWriter, playersWriter, workers, maxBatchBytes, options.OnProgress)
-	}
-
+	stats, err = processParallel(r, clubsWriter, playersWriter, workers, maxBatchBytes, options.OnProgress)
 	if err != nil {
 		return stats, err
 	}
