@@ -5,11 +5,11 @@ root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work_dir="$root_dir/.local/benchmark-workers"
 batch_bin="$work_dir/batch"
 generate_bin="$work_dir/generate"
-input="$work_dir/10m-2-players.jsonl"
+input="$work_dir/1m-26-players.jsonl"
 report="$work_dir/report.md"
 summary_rows="$work_dir/summary-rows.md"
-records=10000000
-players=2
+records=1000000
+players=26
 worker_counts=(1 2 4 8 16)
 
 info() {
@@ -73,7 +73,7 @@ format_mib() {
 
 run_batch() {
   local workers="$1"
-  local run_dir="$work_dir/workers-${workers}"
+  local run_dir="$2"
 
   mkdir -p "$run_dir"
 
@@ -81,6 +81,10 @@ run_batch() {
     cd "$run_dir"
     "$time_bin" -v -o time.txt "$batch_bin" -workers "$workers" "$input" > stats.txt
   )
+}
+
+warm_input_cache() {
+  dd if="$input" of=/dev/null bs=4M > /dev/null 2>&1
 }
 
 mkdir -p "$work_dir"
@@ -91,6 +95,8 @@ info "Usando GNU time: $time_bin"
 
 info "Gerando uma entrada com $records clubes e $players jogadores por clube..."
 "$generate_bin" -records "$records" -players "$players" -output "$input" > /dev/null
+info "Aquecendo o cache da entrada antes das medições..."
+warm_input_cache
 
 : > "$summary_rows"
 baseline_dir=""
@@ -98,10 +104,10 @@ previous_seconds=""
 plateau_workers=""
 
 for workers in "${worker_counts[@]}"; do
-  info "Processando com $workers worker(s)..."
-  run_batch "$workers"
-
   run_dir="$work_dir/workers-${workers}"
+  info "Processando isoladamente com $workers worker(s)..."
+  run_batch "$workers" "$run_dir"
+
   if [[ -z "$baseline_dir" ]]; then
     baseline_dir="$run_dir"
   elif ! cmp -s "$baseline_dir/clubs.csv" "$run_dir/clubs.csv" || ! cmp -s "$baseline_dir/players.csv" "$run_dir/players.csv"; then
@@ -112,7 +118,6 @@ for workers in "${worker_counts[@]}"; do
   elapsed="$(time_value 'Elapsed (wall clock)' "$run_dir/time.txt")"
   elapsed_seconds="$(wall_seconds "$elapsed")"
   rss="$(format_mib "$(time_value 'Maximum resident set size' "$run_dir/time.txt")")"
-
   if [[ -z "$previous_seconds" ]]; then
     gain="base"
   elif awk -v current="$elapsed_seconds" -v previous="$previous_seconds" 'BEGIN { exit !(current < previous) }'; then
@@ -131,7 +136,7 @@ done
 {
   printf '# Benchmark de Workers\n\n'
   printf 'Gerado por `scripts/benchmark-workers.sh` com uma única entrada de %s clubes e %s jogadores por clube.\n\n' "$records" "$players"
-  printf 'Cada execução é comparada byte a byte com a saída de 1 worker. O GNU `time -v` é necessário apenas para o benchmark; o executável `batch` não depende dele.\n\n'
+  printf 'A compilação, a geração, o aquecimento do cache da entrada e a comparação dos CSVs ficam fora da medição. Cada processo batch é executado isoladamente e comparado byte a byte com a saída de 1 worker. O GNU `time -v` é necessário apenas para o benchmark; o executável `batch` não depende dele.\n\n'
   printf '| Workers | Tempo decorrido | Memória máxima (RSS) | Ganho em relação ao anterior |\n'
   printf '| ---: | ---: | ---: | ---: |\n'
   awk '1' "$summary_rows"

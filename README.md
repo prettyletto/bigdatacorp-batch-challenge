@@ -74,13 +74,15 @@ go run ./cmd/generate -records 1000000 -players 2 -output .local/1m.jsonl
 
 ## Benchmark
 
-O script `scripts/benchmark-workers.sh` gera uma única entrada de 10 milhões de clubes, com 2 jogadores por clube, e executa o batch com `1`, `2`, `4`, `8` e `16` workers. Cada saída é comparada byte a byte com a execução de 1 worker.
+O script `scripts/benchmark-workers.sh` gera uma única entrada de 1 milhão de clubes, com 26 jogadores por clube, e executa o batch com `1`, `2`, `4`, `8` e `16` workers nessa ordem. A compilação, a geração, o aquecimento do cache da entrada e a comparação byte a byte ficam fora da medição.
 
 ```bash
 scripts/benchmark-workers.sh
 ```
 
 O benchmark requer o GNU `time` com suporte à opção `-v`; o executável `batch` não depende dessa ferramenta. O relatório local é escrito em `.local/benchmark-workers/report.md` e contém apenas os dados relevantes:
+
+As medições de referência deste projeto foram feitas em um AMD Ryzen 7 5825U with Radeon Graphics, com 8 núcleos e 16 threads.
 
 | Coluna | Leitura |
 | --- | --- |
@@ -89,17 +91,17 @@ O benchmark requer o GNU `time` com suporte à opção `-v`; o executável `batc
 | Memória máxima (RSS) | Pico de memória residente da execução. |
 | Ganho em relação ao anterior | Redução real de tempo em comparação com a linha anterior; `sem ganho` indica o primeiro ponto em que aumentar workers não ajudou. |
 
-Os resultados abaixo foram gerados por `scripts/benchmark-workers.sh`, com 10 milhões de clubes e 2 jogadores por clube, em um AMD Ryzen 7 5825U with Radeon Graphics, com 8 núcleos e 16 threads:
+Resultados obtidos nesta máquina com 1 milhão de clubes e 26 jogadores por clube:
 
 | Workers | Tempo decorrido | Memória máxima (RSS) | Ganho em relação ao anterior |
 | ---: | ---: | ---: | ---: |
-| 1 | 2:15.33 | 9.5 MiB | base |
-| 2 | 1:21.74 | 10.1 MiB | 39.6% mais rápido |
-| 4 | 0:58.96 | 12.2 MiB | 27.9% mais rápido |
-| 8 | 0:53.08 | 19.9 MiB | 10.0% mais rápido |
-| 16 | 0:49.44 | 37.3 MiB | 6.9% mais rápido |
+| 1 | 1:21.56 | 19.4 MiB | base |
+| 2 | 0:50.62 | 29.4 MiB | 37.9% mais rápido |
+| 4 | 0:35.43 | 46.3 MiB | 30.0% mais rápido |
+| 8 | 0:29.53 | 83.7 MiB | 16.7% mais rápido |
+| 16 | 0:27.49 | 132.8 MiB | 6.9% mais rápido |
 
-Nesta execução, todos os aumentos de workers reduziram o tempo. Cada resultado foi validado byte a byte contra a saída com 1 worker.
+Nesta execução, todos os aumentos de workers reduziram o tempo. O relatório local em `.local/benchmark-workers/report.md` preserva a mesma tabela.
 
 
 ## Uso de IA
