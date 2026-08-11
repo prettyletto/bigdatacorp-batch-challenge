@@ -83,7 +83,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	defer playersOutput.Discard()
 
-	stats, err := batch.ProcessWithOptions(inputFile, clubsOutput.file, playersOutput.file,batch.Options{Workers: workers} )
+	stats, err := batch.ProcessWithOptions(inputFile, clubsOutput.file, playersOutput.file, batch.Options{Workers: workers})
 	if err != nil {
 		fmt.Fprintf(stderr, "erro ao processar arquivo: %v\n", err)
 		return 1
