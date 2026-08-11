@@ -53,6 +53,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	if workers < 1 {
 		fmt.Fprintln(stderr, "erro: workers deve ser maior que zero")
+		return 1
 	}
 
 	inputPath := flags.Arg(0)

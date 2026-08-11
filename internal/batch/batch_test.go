@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -96,6 +97,64 @@ func TestProcessReadsSampleFile(t *testing.T) {
 	}
 	if got := readCSV(t, playersOutput.String()); len(got) != 9 {
 		t.Fatalf("players rows = %d, want 9", len(got))
+	}
+}
+
+func TestProcessWithWorkersMatchesSequentialOutputAcrossBatches(t *testing.T) {
+	const records = recordsPerWorkerBatch*8 + 1
+	input := workerTestInput(records)
+
+	sequentialStats, sequentialClubs, sequentialPlayers := processWithWorkers(t, input, 1)
+	parallelStats, parallelClubs, parallelPlayers := processWithWorkers(t, input, 8)
+
+	if parallelStats != sequentialStats {
+		t.Fatalf("parallel stats = %+v, want sequential stats %+v", parallelStats, sequentialStats)
+	}
+	if parallelClubs != sequentialClubs {
+		t.Fatal("clubs CSV differs between sequential and parallel processing")
+	}
+	if parallelPlayers != sequentialPlayers {
+		t.Fatal("players CSV differs between sequential and parallel processing")
+	}
+}
+
+func TestProcessWithOptionsHandlesWorkerCounts(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		workers int
+		wantErr bool
+	}{
+		{name: "zero uses sequential processing", workers: 0},
+		{name: "one worker", workers: 1},
+		{name: "more workers than records", workers: 8},
+		{name: "negative worker count", workers: -1, wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var clubsOutput bytes.Buffer
+			var playersOutput bytes.Buffer
+			stats, err := ProcessWithOptions(
+				strings.NewReader(`{"club_id":"SCCP","championship":"SERIE A","players":[{"player_id":"SCCP-10"}]}`),
+				&clubsOutput,
+				&playersOutput,
+				Options{Workers: tt.workers},
+			)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected an error")
+				}
+				if clubsOutput.Len() != 0 || playersOutput.Len() != 0 {
+					t.Fatal("outputs should remain empty when the worker count is invalid")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ProcessWithOptions returned error: %v", err)
+			}
+			if stats != (Stats{RecordsRead: 1, SerieAClubs: 1, ClubRowsWritten: 1, PlayerRowsWritten: 1}) {
+				t.Fatalf("stats = %+v, want one processed club and player", stats)
+			}
+		})
 	}
 }
 
@@ -311,6 +370,51 @@ func processFixture(t *testing.T, filename string) (Stats, [][]string, [][]strin
 	}
 
 	return stats, readCSV(t, clubsOutput.String()), readCSV(t, playersOutput.String())
+}
+
+func processWithWorkers(t *testing.T, input string, workers int) (Stats, string, string) {
+	t.Helper()
+	var clubsOutput bytes.Buffer
+	var playersOutput bytes.Buffer
+	stats, err := ProcessWithOptions(
+		strings.NewReader(input),
+		&clubsOutput,
+		&playersOutput,
+		Options{Workers: workers},
+	)
+	if err != nil {
+		t.Fatalf("processing with %d workers: %v", workers, err)
+	}
+	return stats, clubsOutput.String(), playersOutput.String()
+}
+
+func workerTestInput(records int) string {
+	var input strings.Builder
+
+	for i := 0; i < records; i++ {
+		if i%97 == 0 {
+			input.WriteString("invalid json\n")
+			continue
+		}
+
+		championship := "SERIE A"
+		switch i % 3 {
+		case 1:
+			championship = "SERIE B"
+		case 2:
+			championship = "SERIE C"
+		}
+
+		fmt.Fprintf(
+			&input,
+			`{"club_id":"CLUB-%05d","championship":"%s","players":[{"player_id":"PLAYER-%05d"}]}`+"\n",
+			i,
+			championship,
+			i,
+		)
+	}
+
+	return input.String()
 }
 
 func intPointer(value int) *int {
