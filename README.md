@@ -100,7 +100,7 @@ scripts/benchmark-workers.sh
 
 O benchmark requer o GNU `time` com suporte à opção `-v`; o executável `batch` não depende dessa ferramenta. O relatório local é escrito em `.local/benchmark-workers/report.md` e contém apenas os dados relevantes:
 
-As medições de referência deste projeto foram feitas em um AMD Ryzen 7 5825U with Radeon Graphics, com 8 núcleos e 16 threads.
+As medições de referência deste projeto foram feitas em um AMD Ryzen 7 5825U G, com 8 núcleos e 16 threads.
 
 | Coluna | Leitura |
 | --- | --- |
