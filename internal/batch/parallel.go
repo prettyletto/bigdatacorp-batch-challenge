@@ -8,7 +8,10 @@ import (
 	"sync"
 )
 
-const recordsPerWorkerBatch = 512
+const (
+	recordsPerWorkerBatch = 512
+	maxBytes              = 32 << 20
+)
 
 func processParallel(
 	r io.Reader,
@@ -23,7 +26,7 @@ func processParallel(
 	batchSize := workers * recordsPerWorkerBatch
 
 	for {
-		lines, eof, err := readBatch(reader, batchSize)
+		lines, eof, err := readBatch(reader, batchSize, maxBytes)
 		if err != nil {
 			return stats, err
 		}
@@ -44,14 +47,16 @@ func processParallel(
 	return stats, nil
 }
 
-func readBatch(reader *bufio.Reader, size int) (lines [][]byte, eof bool, err error) {
+func readBatch(reader *bufio.Reader, size, maxBytes int) (lines [][]byte, eof bool, err error) {
 	lines = make([][]byte, 0, size)
+	batchBytes := 0
 
 	for len(lines) < size {
 		line, readErr := reader.ReadBytes('\n')
 
 		if len(line) > 0 {
 			lines = append(lines, line)
+			batchBytes += len(line)
 		}
 
 		if errors.Is(readErr, io.EOF) {
@@ -60,6 +65,10 @@ func readBatch(reader *bufio.Reader, size int) (lines [][]byte, eof bool, err er
 
 		if readErr != nil {
 			return lines, false, readErr
+		}
+
+		if batchBytes >= maxBytes {
+			return lines, false, nil
 		}
 	}
 
